@@ -46,7 +46,7 @@ class TestSchemaComparer(unittest.TestCase):
 
         self.assertEqual(len(differences), 1)
         self.assertEqual(differences[0].issue_type, 'missing_table')
-        self.assertEqual(differences[0].severity, 'error')
+        self.assertEqual(differences[0].severity, 'info')
         self.assertEqual(differences[0].entity, 'missing_entity')
 
     def test_extra_table(self):
@@ -95,7 +95,7 @@ class TestSchemaComparer(unittest.TestCase):
 
         missing_col_diffs = [d for d in differences if d.issue_type == 'missing_column']
         self.assertEqual(len(missing_col_diffs), 1)
-        self.assertEqual(missing_col_diffs[0].severity, 'error')
+        self.assertEqual(missing_col_diffs[0].severity, 'info')
         self.assertEqual(missing_col_diffs[0].details['column_name'], 'missing_col')
 
     def test_extra_column(self):

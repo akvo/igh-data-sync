@@ -1,9 +1,10 @@
-# Dataverse Schema Validator
+# Dataverse Schema Validator & Sync
 
-A schema validation tool that detects differences between Microsoft Dataverse entity schemas and local database schemas by comparing against the authoritative $metadata XML.
+A comprehensive toolkit for Microsoft Dataverse that validates schemas and syncs data to SQLite using authoritative $metadata XML for type-accurate table creation.
 
 ## Features
 
+### Schema Validator
 - ✅ Fetches complete OData $metadata XML from Dataverse (~7 MB, 800+ entities)
 - ✅ Parses entity schemas with columns, primary keys, and foreign keys
 - ✅ Supports both SQLite and PostgreSQL databases
@@ -11,7 +12,21 @@ A schema validation tool that detects differences between Microsoft Dataverse en
 - ✅ Generates JSON and Markdown validation reports
 - ✅ Returns exit code 0 (passed) or 1 (failed) for CI/CD integration
 
+### Sync Tool
+- ✅ Integrated schema validation before each sync
+- ✅ Authoritative schema from $metadata (not inferred)
+- ✅ Auto-refresh authentication
+- ✅ Retry with exponential backoff
+- ✅ 429 rate limit handling
+- ✅ Pagination via @odata.nextLink
+- ✅ Concurrency control (50 parallel requests)
+- ✅ Incremental sync using modifiedon timestamps
+- ✅ Full JSON storage for schema evolution
+- ✅ Sync state tracking and resumability
+
 ## Architecture
+
+### Schema Validator Workflow
 
 The validator follows a clean 6-step workflow:
 
@@ -22,35 +37,63 @@ The validator follows a clean 6-step workflow:
 5. **Compare Schemas** - Detect differences (errors, warnings, info)
 6. **Generate Reports** - Create JSON, Markdown reports and console summary
 
+### Sync Workflow
+
+The sync tool follows a 7-step workflow with integrated validation:
+
+1. **Load Configuration** - Read credentials and entity list (with api_name mapping)
+2. **Authenticate** - OAuth with auto-refresh (50-min window before expiry)
+3. **Validate Schema** - Compare $metadata against database, exit on breaking changes
+4. **Initialize Database** - Create missing tables and sync tracking tables
+5. **Prepare for Sync** - Fetch schemas from $metadata for all valid entities
+6. **Sync Entities** - Incremental sync with pagination, retry, and concurrency control
+7. **Summary** - Report total records added/updated across all entities
+
 ## Project Structure
 
 ```
 igh-clean-sync/
-├── validate_schema.py          # Main entrypoint
-├── entities_config.json         # Entity configuration (23 entities)
+├── validate_schema.py          # Schema validator entrypoint
+├── sync_dataverse.py            # Sync tool entrypoint
+├── entities_config.json         # Entity configuration (23 entities with api_name)
 ├── .env                         # Credentials (not committed)
 ├── .env.example                 # Template
 ├── requirements.txt             # Dependencies
 ├── lib/                         # Reusable utilities
-│   ├── auth.py                  # OAuth authentication
-│   ├── dataverse_client.py      # Async HTTP client
-│   ├── config.py                # Configuration loading
+│   ├── auth.py                  # OAuth authentication with auto-refresh
+│   ├── dataverse_client.py      # Async HTTP client with retry/pagination
+│   ├── config.py                # Configuration loading with entity mapping
 │   ├── type_mapping.py          # Data structures and type mappings
-│   └── validation/              # Validation components
-│       ├── metadata_parser.py   # Parse $metadata XML (KEY COMPONENT)
-│       ├── dataverse_schema.py  # Fetch schemas from Dataverse
-│       ├── database_schema.py   # Query database schemas
-│       ├── schema_comparer.py   # Compare and detect differences
-│       └── report_generator.py  # Generate reports
-└── tests/                       # Unit tests (31 tests, all passing)
+│   ├── validation/              # Validation components
+│   │   ├── metadata_parser.py   # Parse $metadata XML (KEY COMPONENT)
+│   │   ├── dataverse_schema.py  # Fetch schemas from Dataverse
+│   │   ├── database_schema.py   # Query database schemas
+│   │   ├── schema_comparer.py   # Compare and detect differences
+│   │   └── report_generator.py  # Generate reports
+│   └── sync/                    # Sync components
+│       ├── schema_initializer.py # Create tables from $metadata schemas
+│       ├── database.py          # SQLite operations (UPSERT, tracking)
+│       └── sync_state.py        # Sync state management
+└── tests/                       # Unit tests (36 tests, all passing)
     ├── test_type_mapping.py
     ├── test_metadata_parser.py
-    └── test_schema_comparer.py
+    ├── test_schema_comparer.py
+    ├── test_config.py           # Entity name mapping tests
+    └── test_database.py         # Database operations tests
 ```
 
 ## Installation
 
 ```bash
+# Create virtual environment
+python3 -m venv .venv
+
+# Activate virtual environment
+# On Linux/macOS:
+source .venv/bin/activate
+# On Windows:
+# .venv\Scripts\activate
+
 # Install dependencies
 pip install -r requirements.txt
 
@@ -58,7 +101,7 @@ pip install -r requirements.txt
 cp .env.example .env
 
 # Edit .env with your credentials
-nano .env
+vim .env
 ```
 
 ## Configuration
@@ -79,38 +122,115 @@ SQLITE_DB_PATH=../dataverse_complete.db
 
 ### entities_config.json
 
-Lists entities to validate:
+Lists entities to sync/validate with singular/plural name mapping:
 ```json
 {
   "entities": [
     {
       "name": "vin_candidate",
+      "api_name": "vin_candidates",
       "filtered": false,
       "description": "All candidate records"
     },
-    ...
+    {
+      "name": "account",
+      "api_name": "accounts",
+      "filtered": true,
+      "description": "Filtered accounts linked via junction tables"
+    }
   ]
 }
 ```
 
+**Field descriptions:**
+- `name`: Singular entity name used in $metadata XML lookups
+- `api_name`: Plural name used for API endpoints and table names
+- `filtered`: If true, sync only records linked to already-synced entities
+- `description`: Human-readable description
+
 ## Usage
 
-### Basic validation (auto-detect database type):
-```bash
-python3 validate_schema.py
-```
+### Schema Validation
 
-### Specify database type:
-```bash
-python3 validate_schema.py --db-type sqlite
-python3 validate_schema.py --db-type postgresql
-```
+Validate database schema against Dataverse $metadata:
 
-### Custom report paths:
 ```bash
-python3 validate_schema.py \
+# Activate virtualenv first
+source .venv/bin/activate
+
+# Basic validation (auto-detect database type)
+python validate_schema.py
+
+# Specify database type
+python validate_schema.py --db-type sqlite
+python validate_schema.py --db-type postgresql
+
+# Custom report paths
+python validate_schema.py \
   --json-report reports/schema.json \
   --md-report reports/schema.md
+```
+
+### Data Sync
+
+Sync Dataverse entities to SQLite with integrated schema validation:
+
+```bash
+# Activate virtualenv first
+source .venv/bin/activate
+
+# Run sync
+python sync_dataverse.py
+```
+
+The sync tool automatically:
+1. Validates schema before syncing (exits on breaking changes)
+2. Creates missing tables from $metadata schemas
+3. Performs incremental sync using `modifiedon` timestamps
+4. Handles rate limiting (429) and retries failed requests
+5. Tracks sync state in `_sync_state` and `_sync_log` tables
+6. Stores full JSON responses for schema evolution
+
+**Output example:**
+```
+============================================================
+DATAVERSE TO SQLITE SYNC
+============================================================
+
+[1/7] Loading configuration...
+  ✓ Loaded config for 23 entities
+  ✓ Database: ../dataverse_complete.db
+
+[2/7] Authenticating...
+  ✓ Authenticated (tenant: abc123...)
+
+[3/7] Validating schema...
+  Fetching schemas from Dataverse $metadata...
+
+  Schema Validation Results:
+    Errors: 0, Warnings: 0, Info: 2
+
+    ℹ️  INFO [new_entity]: New entity - table will be created
+
+  ✓ Validation passed with 0 warning(s), 2 info
+
+[4/7] Initializing database...
+  ✓ Sync tables initialized
+  ✓ Created table: new_entity
+
+[5/7] Preparing for sync...
+  ✓ Schemas loaded for 23 entities
+
+[6/7] Syncing data...
+  Syncing vin_candidates...
+  ✓ vin_candidates: 150 added, 23 updated
+  ...
+
+[7/7] Sync complete!
+============================================================
+Total records added: 1523
+Total records updated: 347
+============================================================
 ```
 
 ## Output
@@ -137,10 +257,34 @@ Total issues: 5
 
 ## Testing
 
-Run the test suite (31 tests):
+Run the test suite (36 tests):
 ```bash
-python3 -m unittest discover tests/ -v
+# Activate virtualenv
+source .venv/bin/activate
+
+# Run tests
+python -m unittest discover tests/ -v
 ```
+
+## Schema Change Handling
+
+The sync tool validates schemas before each sync and handles changes automatically:
+
+| Schema Change | Severity | Behavior |
+|--------------|----------|----------|
+| **Type mismatch** (e.g., INT → TEXT) | ERROR | Alert and exit sync (prevents data corruption) |
+| **Primary key change** | ERROR | Alert and exit sync (breaking change) |
+| **Missing table** (new entity in config) | INFO | Alert and auto-create table from $metadata |
+| **New column** in Dataverse | INFO | Alert and continue (stored in `json_response`) |
+| **Removed column** from Dataverse | INFO | Alert and continue (column remains in DB) |
+| **Entity in config but not in $metadata** | WARNING | Alert and skip entity |
+
+**Design rationale:**
+- **Exit on type/PK changes**: Ensures PostgreSQL compatibility (no flexible typing)
+- **Auto-create tables**: New entities are expected when config is updated
+- **No ALTER TABLE**: New columns stored in `json_response` for schema evolution
+- **Keep removed columns**: Preserves historical data, no destructive changes
+- **No interactivity**: All decisions automated for CI/CD compatibility
 
 ## Design Decisions
 
@@ -186,6 +330,7 @@ Example CI workflow:
 
 ## Success Criteria
 
+### Schema Validator
 - ✅ Fetches $metadata XML (~7 MB, 800+ entities)
 - ✅ Extracts all requested entity schemas
 - ✅ Detects missing tables in database
@@ -194,7 +339,20 @@ Example CI workflow:
 - ✅ Detects foreign key differences
 - ✅ Generates JSON and Markdown reports
 - ✅ Exit code 0 = passed, 1 = failed
-- ✅ 31 unit tests, all passing
+
+### Sync Tool
+- ✅ Integrated schema validation before each sync
+- ✅ Auto-creates tables from authoritative $metadata schemas
+- ✅ Exits on breaking schema changes (type/PK mismatches)
+- ✅ Incremental sync using modifiedon timestamps
+- ✅ Pagination with @odata.nextLink
+- ✅ Retry with exponential backoff (1-16s)
+- ✅ Rate limiting (429) with Retry-After handling
+- ✅ Concurrency control (50 parallel requests)
+- ✅ Full JSON storage for schema evolution
+- ✅ Sync state tracking (_sync_state, _sync_log)
+- ✅ UPSERT operations (INSERT OR REPLACE)
+- ✅ 36 unit tests, all passing
 
 ## License
 

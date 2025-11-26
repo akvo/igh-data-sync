@@ -30,7 +30,8 @@ class Config:
 @dataclass
 class EntityConfig:
     """Configuration for a single entity."""
-    name: str
+    name: str          # Singular name from $metadata (e.g., vin_candidate)
+    api_name: str      # Plural name for API endpoint (e.g., vin_candidates)
     filtered: bool
     description: str
 
@@ -125,11 +126,14 @@ def load_entity_configs(path: str = 'entities_config.json') -> List[EntityConfig
     """
     Load full entity configurations from entities_config.json.
 
+    Auto-pluralizes entity names for API endpoints if api_name not specified.
+    Pluralization: simply adds 's' to the end (e.g., vin_candidate → vin_candidates)
+
     Args:
         path: Path to entities configuration file
 
     Returns:
-        List of EntityConfig objects
+        List of EntityConfig objects with both name (singular) and api_name (plural)
 
     Raises:
         FileNotFoundError: If config file doesn't exist
@@ -155,8 +159,15 @@ def load_entity_configs(path: str = 'entities_config.json') -> List[EntityConfig
         if not isinstance(entity, dict):
             raise ValueError(f"Invalid entity entry: {entity}")
 
+        name = entity.get('name', '')
+
+        # Auto-pluralize if api_name not specified
+        # Simple rule: add 's' to the end
+        api_name = entity.get('api_name', name + 's' if name else '')
+
         entity_configs.append(EntityConfig(
-            name=entity.get('name', ''),
+            name=name,
+            api_name=api_name,
             filtered=entity.get('filtered', False),
             description=entity.get('description', '')
         ))

@@ -71,7 +71,7 @@ class SchemaComparer:
                 differences.append(SchemaDifference(
                     entity=entity_name,
                     issue_type='missing_table',
-                    severity='error',
+                    severity='info',  # New entity - will be created
                     description=f"Table '{entity_name}' exists in Dataverse but not in database",
                     details={'entity_name': entity_name}
                 ))
@@ -117,7 +117,7 @@ class SchemaComparer:
                 differences.append(SchemaDifference(
                     entity=entity_name,
                     issue_type='missing_column',
-                    severity='error',
+                    severity='info',  # New column in Dataverse - stored in json_response
                     description=f"Column '{dv_col.name}' missing in database",
                     details={
                         'column_name': dv_col.name,

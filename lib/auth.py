@@ -1,6 +1,7 @@
 """OAuth authentication for Dataverse API."""
 import re
 import requests
+import time
 from typing import Optional
 from .config import Config
 
@@ -18,6 +19,8 @@ class DataverseAuth:
         self.config = config
         self.tenant_id: Optional[str] = None
         self.token: Optional[str] = None
+        self.token_expiry: float = 0.0  # Unix timestamp when token expires
+        self.refresh_window: int = 3000  # Refresh 3000s (50 min) before expiry
 
     def discover_tenant_id(self) -> str:
         """
@@ -48,7 +51,8 @@ class DataverseAuth:
 
             # Extract tenant ID from authorization_uri
             # Format: Bearer authorization_uri="https://login.microsoftonline.com/TENANT_ID/oauth2/authorize"
-            match = re.search(r'authorization_uri="[^"]*?/([0-9a-f\-]{36})/oauth2', www_auth, re.IGNORECASE)
+            # or: Bearer authorization_uri=https://login.microsoftonline.com/TENANT_ID/oauth2/authorize
+            match = re.search(r'authorization_uri="?[^"\s]*?/([0-9a-f\-]{36})/oauth2', www_auth, re.IGNORECASE)
 
             if not match:
                 raise RuntimeError(f"Could not extract tenant ID from WWW-Authenticate header: {www_auth}")
@@ -89,12 +93,33 @@ class DataverseAuth:
 
             token_response = response.json()
             access_token = token_response.get('access_token')
+            expires_in = token_response.get('expires_in', 3599)  # Default 1 hour
 
             if not access_token:
                 raise RuntimeError("No access_token in authentication response")
 
             self.token = access_token
+            self.token_expiry = time.time() + expires_in
+
             return access_token
 
         except requests.RequestException as e:
             raise RuntimeError(f"Authentication failed: {e}")
+
+    def get_token(self) -> str:
+        """
+        Get valid access token, refreshing if needed.
+
+        Auto-refreshes token if it will expire within refresh_window (3000s).
+
+        Returns:
+            Valid access token
+
+        Raises:
+            RuntimeError: If authentication fails
+        """
+        # Check if token needs refresh
+        if not self.token or time.time() >= (self.token_expiry - self.refresh_window):
+            self.authenticate()
+
+        return self.token

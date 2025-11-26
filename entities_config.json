@@ -2,116 +2,139 @@
   "entities": [
     {
       "name": "vin_candidate",
+      "api_name": "vin_candidates",
       "filtered": false,
       "description": "All candidate records"
     },
     {
       "name": "vin_product",
+      "api_name": "vin_products",
       "filtered": false,
       "description": "All product records"
     },
     {
       "name": "vin_disease",
+      "api_name": "vin_diseases",
       "filtered": false,
       "description": "All disease records"
     },
     {
       "name": "vin_clinicaltrial",
+      "api_name": "vin_clinicaltrials",
       "filtered": false,
       "description": "All clinical trial records"
     },
     {
       "name": "vin_source",
+      "api_name": "vin_sources",
       "filtered": false,
       "description": "All source records"
     },
     {
       "name": "vin_rdstage",
+      "api_name": "vin_rdstages",
       "filtered": false,
       "description": "All R&D stage records"
     },
     {
       "name": "vin_rdstageproduct",
+      "api_name": "vin_rdstageproducts",
       "filtered": false,
       "description": "All R&D stage product records"
     },
     {
       "name": "vin_rdpriority",
+      "api_name": "vin_rdpriorities",
       "filtered": false,
       "description": "All R&D priority records"
     },
     {
       "name": "vin_archetype",
+      "api_name": "vin_archetypes",
       "filtered": false,
       "description": "All archetype records"
     },
     {
       "name": "vin_clinicalusestatus",
+      "api_name": "vin_clinicalusestatuses",
       "filtered": false,
       "description": "All clinical use status records"
     },
     {
       "name": "vin_country",
+      "api_name": "vin_countries",
       "filtered": false,
       "description": "All country records"
     },
     {
       "name": "vin_region",
+      "api_name": "vin_regions",
       "filtered": false,
       "description": "All region records"
     },
     {
       "name": "account",
+      "api_name": "accounts",
       "filtered": true,
       "description": "Only accounts linked to downloaded candidates/trials via junction tables"
     },
     {
       "name": "contact",
+      "api_name": "contacts",
       "filtered": true,
       "description": "Only contacts linked to downloaded records via foreign keys"
     },
     {
       "name": "systemuser",
+      "api_name": "systemusers",
       "filtered": false,
       "description": "All system user records"
     },
     {
       "name": "vin_vin_candidate_account",
+      "api_name": "vin_vin_candidate_accountset",
       "filtered": false,
       "description": "Junction table: candidate-account relationships"
     },
     {
       "name": "vin_vin_candidate_vin_rdpriority",
+      "api_name": "vin_vin_candidate_vin_rdpriorityset",
       "filtered": false,
       "description": "Junction table: candidate-rdpriority relationships"
     },
     {
       "name": "vin_vin_candidate_systemuser",
+      "api_name": "vin_vin_candidate_systemuserset",
       "filtered": false,
       "description": "Junction table: candidate-systemuser relationships"
     },
     {
       "name": "vin_vin_candidate_vin_country",
+      "api_name": "vin_vin_candidate_vin_countryset",
       "filtered": false,
       "description": "Junction table: candidate-country relationships"
     },
     {
       "name": "vin_vin_candidate_vin_region",
+      "api_name": "vin_vin_candidate_vin_regionset",
       "filtered": false,
       "description": "Junction table: candidate-region relationships"
     },
     {
       "name": "vin_vin_clinicaltrial_account",
+      "api_name": "vin_vin_clinicaltrial_accountset",
       "filtered": false,
       "description": "Junction table: clinicaltrial-account relationships"
     },
     {
       "name": "vin_vin_clinicaltrial_account_collaborator",
+      "api_name": "vin_vin_clinicaltrial_account_collaboratorset",
       "filtered": false,
       "description": "Junction table: clinicaltrial-account collaborator relationships"
     },
     {
       "name": "vin_vin_clinicaltrial_vin_country",
+      "api_name": "vin_vin_clinicaltrial_vin_countryset",
       "filtered": false,
       "description": "Junction table: clinicaltrial-country relationships"
     }

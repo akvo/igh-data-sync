@@ -1,0 +1,117 @@
+"""Schema initialization using authoritative $metadata XML."""
+from typing import List
+from ..config import EntityConfig
+from ..type_mapping import TableSchema
+from ..validation.dataverse_schema import DataverseSchemaFetcher
+
+
+def generate_create_table_sql(
+    table_name: str,
+    schema: TableSchema,
+    special_columns: List[str] = None
+) -> str:
+    """
+    Generate CREATE TABLE SQL from TableSchema.
+
+    Args:
+        table_name: Name for the table (plural, e.g., 'vin_candidates')
+        schema: TableSchema from $metadata (singular entity name)
+        special_columns: Additional columns to add (e.g., ['json_response', 'sync_time'])
+
+    Returns:
+        SQL CREATE TABLE statement
+    """
+    lines = [f"CREATE TABLE IF NOT EXISTS {table_name} ("]
+
+    # Add columns from schema
+    column_defs = []
+    for col in schema.columns:
+        col_def = f"  {col.name} {col.db_type}"
+
+        # Add NOT NULL if not nullable
+        if not col.nullable:
+            col_def += " NOT NULL"
+
+        # Mark primary key
+        if col.name.lower() == schema.primary_key.lower() if schema.primary_key else False:
+            col_def += " PRIMARY KEY"
+
+        column_defs.append(col_def)
+
+    # Add special sync columns
+    if special_columns:
+        if 'json_response' in special_columns:
+            column_defs.append("  json_response TEXT NOT NULL")
+        if 'sync_time' in special_columns:
+            column_defs.append("  sync_time TEXT NOT NULL")
+        if 'valid_from' in special_columns:
+            column_defs.append("  valid_from TEXT")
+
+    lines.append(",\n".join(column_defs))
+    lines.append(");")
+
+    return "\n".join(lines)
+
+
+async def initialize_tables(config, entities: List[EntityConfig], client, db_manager):
+    """
+    Create tables using authoritative $metadata schemas.
+
+    Args:
+        config: Configuration object
+        entities: List of EntityConfig objects to initialize
+        client: DataverseClient instance
+        db_manager: DatabaseManager instance
+
+    Raises:
+        RuntimeError: If schema fetch or table creation fails
+    """
+    from ..validation.dataverse_schema import DataverseSchemaFetcher
+
+    # Fetch schemas from $metadata
+    fetcher = DataverseSchemaFetcher(client, target_db='sqlite')
+
+    # Get singular names for $metadata lookup
+    singular_names = [e.name for e in entities]
+
+    print(f"Fetching schemas for {len(entities)} entities from $metadata...")
+    schemas = await fetcher.fetch_schemas_from_metadata(singular_names)
+
+    # Create tables
+    for entity in entities:
+        singular_name = entity.name      # vin_candidate
+        plural_name = entity.api_name    # vin_candidates
+
+        if singular_name not in schemas:
+            print(f"⚠️  Skipping '{singular_name}' - not found in $metadata")
+            continue
+
+        schema = schemas[singular_name]
+
+        # Check if table exists
+        if db_manager.table_exists(plural_name):
+            print(f"ℹ️  Table '{plural_name}' already exists, skipping")
+            continue
+
+        print(f"Creating table '{plural_name}' with {len(schema.columns)} columns...")
+
+        # Generate CREATE TABLE SQL
+        create_sql = generate_create_table_sql(
+            table_name=plural_name,
+            schema=schema,
+            special_columns=['json_response', 'sync_time', 'valid_from']
+        )
+
+        # Execute CREATE TABLE
+        db_manager.execute(create_sql)
+
+        # Create indexes for timestamp columns
+        if any(c.name == 'modifiedon' for c in schema.columns):
+            db_manager.create_index(plural_name, 'modifiedon')
+
+        if any(c.name == 'createdon' for c in schema.columns):
+            db_manager.create_index(plural_name, 'createdon')
+
+        print(f"✓ Table '{plural_name}' created successfully")
+
+    print(f"✓ Schema initialization complete")

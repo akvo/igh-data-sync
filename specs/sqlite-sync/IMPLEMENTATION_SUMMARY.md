@@ -176,6 +176,150 @@ This document describes the **actual implementation** of the Dataverse to SQLite
 
 **Resilience Philosophy:** Sync continues even with errors. DBA can investigate offline without blocking data pipeline.
 
+#### Foreign Key Detection
+
+**Design Decision:** Unified detection combining authoritative metadata with pattern-based inference.
+
+**Why:**
+- NavigationProperty provides explicit FK relationships from OData schema
+- Many FK columns lack NavigationProperty metadata (lookup fields, junction columns)
+- Pattern matching fills coverage gaps for standard Dataverse naming conventions
+- Comprehensive FK detection enables accurate relationship tracking (207 FKs across 23 entities)
+
+**Implementation:**
+
+```python
+# lib/validation/metadata_parser.py:177-302 (_parse_all_foreign_keys)
+
+def _parse_all_foreign_keys(entity_elem, ns, columns, primary_key):
+    """
+    Unified FK detection using NavigationProperty + column pattern matching.
+
+    Strategy:
+    1. Parse NavigationProperty elements (authoritative source)
+    2. Track which columns have FK metadata
+    3. Pattern-match remaining columns for:
+       - _*_value pattern (Dataverse lookup fields)
+       - *id pattern (junction table columns)
+    4. Return consolidated FK list
+    """
+    foreign_keys = []
+
+    # STEP 1: Parse NavigationProperty elements
+    for nav_prop in entity_elem.findall('edm:NavigationProperty', ns):
+        # Extract FK from ReferentialConstraint
+        # Example: Property="_createdby_value" ReferencedProperty="systemuserid"
+        #          Type="mscrm.systemuser"
+        foreign_keys.append(fk)
+
+    # STEP 2: Track columns with FK metadata
+    columns_with_fks = {fk.column for fk in foreign_keys}
+
+    # STEP 3: Pattern-match remaining columns
+    for col in columns:
+        if col.name in columns_with_fks:
+            continue  # Already has FK from NavigationProperty
+
+        # Pattern 1: _fieldname_value
+        if col.name.startswith('_') and col.name.endswith('_value'):
+            fieldname = col.name[1:-6]  # _createdby_value → createdby
+            fk = ForeignKeyMetadata(
+                column=col.name,
+                referenced_table=fieldname,
+                referenced_column=f"{fieldname}id"
+            )
+            foreign_keys.append(fk)
+
+        # Pattern 2: *id
+        elif col.name.endswith('id'):
+            if col.name == primary_key or col.name == 'versionnumber':
+                continue  # Exclude primary keys and special columns
+
+            referenced_table = col.name[:-2]  # accountid → account
+            fk = ForeignKeyMetadata(
+                column=col.name,
+                referenced_table=referenced_table,
+                referenced_column=col.name
+            )
+            foreign_keys.append(fk)
+
+    return foreign_keys
+```
+
+**Detection Strategies:**
+
+**1. NavigationProperty Parsing (Authoritative)**
+
+The OData `$metadata` XML contains `<NavigationProperty>` elements that explicitly define foreign key relationships:
+
+```xml
+<NavigationProperty Name="createdby" Type="mscrm.systemuser">
+  <ReferentialConstraint Property="_createdby_value" ReferencedProperty="systemuserid" />
+</NavigationProperty>
+```
+
+This approach:
+- Extracts the FK column (`_createdby_value`)
+- Extracts the referenced table (`systemuser` from `Type="mscrm.systemuser"`)
+- Extracts the referenced column (`systemuserid`)
+- Provides the most accurate FK information
+
+**2. Pattern 1: `_*_value` Columns (Dataverse Lookup Fields)**
+
+Dataverse uses a standard naming convention for lookup fields:
+
+```
+Column Name             | Referenced Table | Referenced Column
+------------------------|------------------|------------------
+_createdby_value        | createdby        | createdbyid
+_primarycontactid_value | primarycontactid | primarycontactidid
+_accountid_value        | accountid        | accountidid
+```
+
+**How it works:**
+1. Detect columns matching `_*_value` pattern
+2. Strip `_` prefix and `_value` suffix to get field name
+3. Infer referenced table and column from field name
+
+**Why needed:** Some lookup fields lack NavigationProperty in metadata, particularly for external party references and custom fields.
+
+**3. Pattern 2: `*id` Columns (Junction Tables & References)**
+
+Junction tables and simple references use columns ending in `id`:
+
+```
+Table                                    | Column              | Referenced Table
+-----------------------------------------|---------------------|------------------
+vin_vin_candidate_accountset             | accountid           | account
+vin_vin_candidate_accountset             | vin_candidateid     | vin_candidate
+account                                  | address1_addressid  | address1_address
+account                                  | entityimageid       | entityimage
+```
+
+**How it works:**
+1. Detect columns ending in `id`
+2. Exclude primary keys (e.g., `accountid` in `account` table)
+3. Exclude special columns (`versionnumber`)
+4. Strip `id` suffix to get referenced table name
+
+**Why needed:** Junction tables have NO NavigationProperty elements in metadata. Pattern matching is the only way to detect their FKs.
+
+**Example Results:**
+
+**Business Entity (account) - 27 FKs total:**
+- **NavigationProperty:** `_createdby_value`, `_modifiedby_value`, `_primarycontactid_value` (17 total)
+- **Pattern 1:** `_createdbyexternalparty_value`, `_modifiedbyexternalparty_value` (2 total)
+- **Pattern 2:** `address1_addressid`, `address2_addressid`, `entityimageid`, `processid`, `vin_organisationid` (8 total)
+
+**Junction Table (vin_vin_candidate_accountset) - 2 FKs total:**
+- **NavigationProperty:** None (junction tables lack NavigationProperty)
+- **Pattern 2:** `vin_candidateid` → `vin_candidate.vin_candidateid`, `accountid` → `account.accountid`
+
+**Coverage:**
+- Total FKs detected: 207 across 23 entities
+- NavigationProperty: ~80% of FKs
+- Pattern matching: ~20% of FKs (fills critical gaps)
+
 ### 2. Incremental Sync Implementation
 
 **User Value:** Reduce sync time from hours to minutes by fetching only changed records.

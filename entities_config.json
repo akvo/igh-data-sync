@@ -87,8 +87,8 @@
     {
       "name": "systemuser",
       "api_name": "systemusers",
-      "filtered": false,
-      "description": "All system user records"
+      "filtered": true,
+      "description": "Only systemusers referenced by other entities"
     },
     {
       "name": "vin_vin_candidate_account",
@@ -141,8 +141,8 @@
   ],
   "metadata": {
     "total_entities": 23,
-    "filtered_entities": 2,
-    "unfiltered_entities": 21,
+    "filtered_entities": 3,
+    "unfiltered_entities": 20,
     "description": "Configuration for Dataverse entity sync - specifies which entities are synced in full vs filtered by foreign key relationships"
   }
 }

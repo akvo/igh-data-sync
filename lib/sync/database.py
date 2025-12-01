@@ -184,3 +184,35 @@ class DatabaseManager:
             (entity_name, state, last_sync_time, last_timestamp, records_count)
             VALUES (?, 'completed', ?, ?, ?)
         """, (entity_name, datetime.utcnow().isoformat(), timestamp, count))
+
+    def query_distinct_values(self, table_name: str, column_name: str) -> set:
+        """
+        Query distinct non-null values from a column.
+
+        Used for extracting foreign key values during filtered entity sync.
+
+        Args:
+            table_name: Table to query
+            column_name: Column to extract values from
+
+        Returns:
+            Set of distinct values (empty set if table doesn't exist)
+        """
+        if not self.conn:
+            self.connect()
+
+        cursor = self.conn.cursor()
+
+        # Check if table exists
+        cursor.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+            (table_name,)
+        )
+        if not cursor.fetchone():
+            return set()
+
+        # Query distinct values
+        cursor.execute(
+            f"SELECT DISTINCT {column_name} FROM {table_name} WHERE {column_name} IS NOT NULL"
+        )
+        return {row[0] for row in cursor.fetchall()}

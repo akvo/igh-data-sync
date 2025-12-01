@@ -96,3 +96,15 @@ class DataverseSchemaFetcher:
         print(f"Parsed {len(all_schemas)} entity schemas")
 
         return all_schemas
+
+    async def fetch_metadata_xml(self) -> str:
+        """
+        Fetch raw $metadata XML from Dataverse.
+
+        Returns:
+            Raw XML string from $metadata endpoint
+
+        Raises:
+            RuntimeError: If metadata fetch fails
+        """
+        return await self.client.get_metadata()

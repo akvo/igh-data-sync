@@ -88,8 +88,9 @@ class MetadataParser:
         # Parse columns (properties)
         columns = self._parse_properties(entity_elem, ns)
 
-        # Parse foreign keys (navigation properties with referential constraints)
-        foreign_keys = self._parse_foreign_keys(entity_elem, ns)
+        # Parse foreign keys using unified detection
+        # (NavigationProperty + pattern matching for _*_value and *id columns)
+        foreign_keys = self._parse_all_foreign_keys(entity_elem, ns, columns, primary_key)
 
         return TableSchema(
             entity_name=entity_name,
@@ -172,28 +173,44 @@ class MetadataParser:
 
         return columns
 
-    def _parse_foreign_keys(
+    def _parse_all_foreign_keys(
         self,
         entity_elem: ET.Element,
-        ns: Dict[str, str]
+        ns: Dict[str, str],
+        columns: List[ColumnMetadata],
+        primary_key: Optional[str]
     ) -> List[ForeignKeyMetadata]:
         """
-        Parse NavigationProperty elements with ReferentialConstraint to extract foreign keys.
+        Unified FK detection using NavigationProperty + column pattern matching.
 
-        Example XML:
-        <NavigationProperty Name="createdby" Type="mscrm.systemuser">
-          <ReferentialConstraint Property="_createdby_value" ReferencedProperty="systemuserid"/>
-        </NavigationProperty>
+        This method consolidates FK detection by:
+        1. Parsing NavigationProperty elements (authoritative source)
+        2. Pattern-matching remaining columns for:
+           - _*_value pattern (Dataverse lookup fields)
+           - *id pattern (junction table columns)
+
+        Pattern 1: _fieldname_value
+            - Example: _createdby_value → createdby.createdbyid
+            - Dataverse convention for lookup/foreign key fields
+            - Used by regular entities
+
+        Pattern 2: *id (junction tables)
+            - Example: accountid → account.accountid
+            - Used by junction tables (many-to-many relationships)
+            - No NavigationProperty elements in metadata
 
         Args:
             entity_elem: EntityType XML element
             ns: XML namespace dict
+            columns: List of column metadata
+            primary_key: Primary key column name
 
         Returns:
-            List of ForeignKeyMetadata
+            Comprehensive list of ForeignKeyMetadata from all sources
         """
         foreign_keys = []
 
+        # STEP 1: Parse NavigationProperty elements (authoritative source)
         for nav_prop in entity_elem.findall('edm:NavigationProperty', ns):
             # Find ReferentialConstraint
             ref_constraint = nav_prop.find('edm:ReferentialConstraint', ns)
@@ -230,5 +247,56 @@ class MetadataParser:
             )
 
             foreign_keys.append(fk)
+
+        # STEP 2: Track which columns already have FK metadata
+        columns_with_fks = {fk.column for fk in foreign_keys}
+
+        # STEP 3: Pattern-match remaining columns for inferred FKs
+        for col in columns:
+            # Skip if this column already has FK metadata from NavigationProperty
+            if col.name in columns_with_fks:
+                continue
+
+            col_name = col.name.lower()
+
+            # Pattern 1: _fieldname_value (Dataverse lookup fields)
+            # Example: _createdby_value, _primarycontactid_value, _owninguser_value
+            if col_name.startswith('_') and col_name.endswith('_value'):
+                # Strip _ prefix and _value suffix to get field name
+                # _createdby_value → createdby
+                fieldname = col.name[1:-6]  # Remove _ and _value
+
+                fk = ForeignKeyMetadata(
+                    column=col.name,
+                    referenced_table=fieldname,
+                    referenced_column=f"{fieldname}id"
+                )
+
+                foreign_keys.append(fk)
+                continue  # Move to next column
+
+            # Pattern 2: *id (junction table columns and simple references)
+            # Example: accountid, vin_candidateid, vin_clinicaltrialid
+            if col_name.endswith('id'):
+                # Skip primary key
+                if primary_key and col.name == primary_key:
+                    continue
+
+                # Skip versionnumber
+                if col.name == 'versionnumber':
+                    continue
+
+                # Strip 'id' suffix to get referenced table name
+                # accountid → account
+                # vin_candidateid → vin_candidate
+                referenced_table = col.name[:-2]  # Remove 'id'
+
+                fk = ForeignKeyMetadata(
+                    column=col.name,
+                    referenced_table=referenced_table,
+                    referenced_column=col.name
+                )
+
+                foreign_keys.append(fk)
 
         return foreign_keys

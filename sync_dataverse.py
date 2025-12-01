@@ -4,16 +4,19 @@ Dataverse to SQLite Sync
 
 Syncs Dataverse entities to SQLite with integrated schema validation.
 Uses authoritative $metadata schemas for type-accurate table creation.
+Implements filtered entity sync with transitive closure for minimal data transfer.
 
 Usage:
-    python sync_dataverse.py
+    python sync_dataverse.py           # Normal sync
+    python sync_dataverse.py --verify  # Sync + verify reference integrity
 
 Exit codes:
     0 - Sync completed successfully
-    1 - Sync failed (schema validation or sync errors)
+    1 - Sync failed (schema validation, sync errors, or dangling references with --verify)
 """
 import sys
 import asyncio
+import argparse
 from lib.config import load_config, load_entity_configs
 from lib.auth import DataverseAuth
 from lib.dataverse_client import DataverseClient
@@ -23,6 +26,9 @@ from lib.validation.schema_comparer import SchemaComparer
 from lib.sync.database import DatabaseManager
 from lib.sync.schema_initializer import initialize_tables
 from lib.sync.sync_state import SyncStateManager
+from lib.sync.relationship_graph import RelationshipGraph
+from lib.sync.filtered_sync import FilteredSyncManager
+from lib.sync.reference_verifier import ReferenceVerifier
 
 
 async def validate_schema_before_sync(config, entities, client, db_manager):
@@ -207,8 +213,13 @@ async def sync_entity(entity, client, db_manager, state_manager, dv_schemas):
         raise
 
 
-async def main():
-    """Main sync workflow."""
+async def main(verify_references=False):
+    """
+    Main sync workflow.
+
+    Args:
+        verify_references: If True, verify reference integrity after sync
+    """
     print("=" * 60)
     print("DATAVERSE TO SQLITE SYNC")
     print("=" * 60)
@@ -254,6 +265,12 @@ async def main():
             dv_schemas = await fetcher.fetch_schemas_from_metadata([e.name for e in valid_entities])
             print(f"  ✓ Schemas loaded for {len(dv_schemas)} entities")
 
+            # [5.5/7] Build relationship graph for filtered sync
+            print("\n[5.5/7] Building relationship graph...")
+            metadata_xml = await fetcher.fetch_metadata_xml()
+            relationship_graph = RelationshipGraph.build_from_metadata(metadata_xml, entities)
+            print(f"  ✓ Relationship graph built")
+
             # [6/7] Sync Entities
             print("\n[6/7] Syncing data...")
             state_manager = SyncStateManager(db_manager)
@@ -281,21 +298,69 @@ async def main():
                     # sync_entity already printed error and called fail_sync
                     continue
 
-            # Sync filtered entities (simplified for now)
+            # Sync filtered entities using interleaved transitive closure
+            # This allows us to extract contact IDs from accounts after accounts are synced
             if filtered:
-                print(f"\n  Syncing {len(filtered)} filtered entities...")
+                print(f"\n  Syncing {len(filtered)} filtered entities with transitive closure...")
+                sync_manager = FilteredSyncManager(client, db_manager, state_manager)
+
+                # Track synced IDs to detect convergence
+                synced_ids = {entity.api_name: set() for entity in filtered}
+                max_iterations = 5
+
+                for iteration in range(1, max_iterations + 1):
+                    print(f"\n  Transitive closure iteration {iteration}:")
+
+                    # Extract IDs based on current database state
+                    filtered_ids = FilteredSyncManager.extract_filtered_ids(
+                        relationship_graph,
+                        db_manager,
+                        [e.api_name for e in filtered]
+                    )
+
+                    # Check for new IDs
+                    has_new_ids = False
+                    for entity in filtered:
+                        new_ids = filtered_ids.get(entity.api_name, set()) - synced_ids[entity.api_name]
+                        if new_ids:
+                            has_new_ids = True
+                            print(f"    {entity.api_name}: {len(new_ids)} new IDs to sync")
+
+                    # If no new IDs, we've converged
+                    if not has_new_ids:
+                        print(f"    Converged - no new IDs found")
+                        break
+
+                    # Sync entities with new IDs
+                    for entity in filtered:
+                        if entity.name not in dv_schemas:
+                            continue
+
+                        new_ids = filtered_ids.get(entity.api_name, set()) - synced_ids[entity.api_name]
+                        if not new_ids:
+                            continue
+
+                        try:
+                            added, updated = await sync_manager.sync_filtered_entity(
+                                entity,
+                                new_ids,
+                                dv_schemas[entity.name]
+                            )
+                            total_added += added
+                            total_updated += updated
+                            synced_ids[entity.api_name].update(new_ids)
+                            print(f"    ✓ {entity.api_name}: {added} added, {updated} updated")
+                        except Exception as e:
+                            # Log error but continue syncing other entities
+                            failed_entities.append((entity.api_name, str(e)))
+                            print(f"    ❌ {entity.api_name}: Failed - {e}")
+                            continue
+
+                # Log final statistics
+                print(f"\n  Filtered entity sync complete:")
                 for entity in filtered:
-                    if entity.name not in dv_schemas:
-                        continue
-                    try:
-                        added, updated = await sync_entity(entity, client, db_manager, state_manager, dv_schemas)
-                        total_added += added
-                        total_updated += updated
-                    except Exception as e:
-                        # Log error but continue syncing other entities
-                        failed_entities.append((entity.api_name, str(e)))
-                        # sync_entity already printed error and called fail_sync
-                        continue
+                    count = len(synced_ids[entity.api_name])
+                    print(f"    {entity.api_name}: {count} total records synced")
 
             # Report any failures
             if failed_entities:
@@ -304,10 +369,22 @@ async def main():
                     error_preview = error[:100] + "..." if len(error) > 100 else error
                     print(f"  - {entity_name}: {error_preview}")
 
+            # [7/7] Verify references (if --verify flag)
+            if verify_references:
+                print("\n[7/7] Verifying references...")
+                verifier = ReferenceVerifier()
+                report = verifier.verify_references(db_manager, relationship_graph)
+                print(report)
+
+                # Exit with error if issues found
+                if report.issues:
+                    db_manager.close()
+                    sys.exit(1)
+
             db_manager.close()
 
-        # [7/7] Summary
-        print("\n[7/7] Sync complete!")
+        # [8/8] Summary
+        print("\n[8/8] Sync complete!")
         print("=" * 60)
         print(f"Total records added: {total_added}")
         print(f"Total records updated: {total_updated}")
@@ -326,4 +403,14 @@ async def main():
 
 
 if __name__ == '__main__':
-    asyncio.run(main())
+    parser = argparse.ArgumentParser(
+        description='Sync Dataverse entities to SQLite database'
+    )
+    parser.add_argument(
+        '--verify',
+        action='store_true',
+        help='Verify reference integrity after sync (exits with error if dangling references found)'
+    )
+    args = parser.parse_args()
+
+    asyncio.run(main(verify_references=args.verify))

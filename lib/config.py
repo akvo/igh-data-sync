@@ -1,15 +1,17 @@
 """Configuration loading for Dataverse schema validator."""
-import os
+
 import json
+import os
 from dataclasses import dataclass
-from typing import List, Dict
 from pathlib import Path
+
 from dotenv import load_dotenv
 
 
 @dataclass
 class Config:
     """Configuration for Dataverse API and database access."""
+
     api_url: str
     client_id: str
     client_secret: str
@@ -20,23 +22,27 @@ class Config:
     def get_db_type(self) -> str:
         """Determine which database type is configured."""
         if self.postgres_connection_string:
-            return 'postgresql'
+            return "postgresql"
         elif self.sqlite_db_path:
-            return 'sqlite'
+            return "sqlite"
         else:
-            raise ValueError("No database configured. Set either SQLITE_DB_PATH or POSTGRES_CONNECTION_STRING")
+            msg = "No database configured. Set either SQLITE_DB_PATH or POSTGRES_CONNECTION_STRING"
+            raise ValueError(
+                msg,
+            )
 
 
 @dataclass
 class EntityConfig:
     """Configuration for a single entity."""
-    name: str          # Singular name from $metadata (e.g., vin_candidate)
-    api_name: str      # Plural name for API endpoint (e.g., vin_candidates)
+
+    name: str  # Singular name from $metadata (e.g., vin_candidate)
+    api_name: str  # Plural name for API endpoint (e.g., vin_candidates)
     filtered: bool
     description: str
 
 
-def load_config(env_path: str = '.env') -> Config:
+def load_config(env_path: str = ".env") -> Config:
     """
     Load configuration from .env file.
 
@@ -52,39 +58,40 @@ def load_config(env_path: str = '.env') -> Config:
     load_dotenv(env_path)
 
     # Required fields
-    api_url = os.getenv('DATAVERSE_API_URL')
-    client_id = os.getenv('DATAVERSE_CLIENT_ID')
-    client_secret = os.getenv('DATAVERSE_CLIENT_SECRET')
-    scope = os.getenv('DATAVERSE_SCOPE')
+    api_url = os.getenv("DATAVERSE_API_URL")
+    client_id = os.getenv("DATAVERSE_CLIENT_ID")
+    client_secret = os.getenv("DATAVERSE_CLIENT_SECRET")
+    scope = os.getenv("DATAVERSE_SCOPE")
 
     # Validate required fields
     if not all([api_url, client_id, client_secret, scope]):
         missing = []
         if not api_url:
-            missing.append('DATAVERSE_API_URL')
+            missing.append("DATAVERSE_API_URL")
         if not client_id:
-            missing.append('DATAVERSE_CLIENT_ID')
+            missing.append("DATAVERSE_CLIENT_ID")
         if not client_secret:
-            missing.append('DATAVERSE_CLIENT_SECRET')
+            missing.append("DATAVERSE_CLIENT_SECRET")
         if not scope:
-            missing.append('DATAVERSE_SCOPE')
-        raise ValueError(f"Missing required environment variables: {', '.join(missing)}")
+            missing.append("DATAVERSE_SCOPE")
+        msg = f"Missing required environment variables: {', '.join(missing)}"
+        raise ValueError(msg)
 
     # Optional database configuration
-    sqlite_db_path = os.getenv('SQLITE_DB_PATH')
-    postgres_connection_string = os.getenv('POSTGRES_CONNECTION_STRING')
+    sqlite_db_path = os.getenv("SQLITE_DB_PATH")
+    postgres_connection_string = os.getenv("POSTGRES_CONNECTION_STRING")
 
     return Config(
-        api_url=api_url.rstrip('/'),
+        api_url=api_url.rstrip("/"),
         client_id=client_id,
         client_secret=client_secret,
         scope=scope,
         sqlite_db_path=sqlite_db_path,
-        postgres_connection_string=postgres_connection_string
+        postgres_connection_string=postgres_connection_string,
     )
 
 
-def load_entities(path: str = 'entities_config.json') -> List[str]:
+def load_entities(path: str = "entities_config.json") -> list[str]:
     """
     Load entity names from entities_config.json.
 
@@ -101,28 +108,32 @@ def load_entities(path: str = 'entities_config.json') -> List[str]:
     config_path = Path(path)
 
     if not config_path.exists():
-        raise FileNotFoundError(f"Entity configuration file not found: {path}")
+        msg = f"Entity configuration file not found: {path}"
+        raise FileNotFoundError(msg)
 
-    with open(config_path, 'r') as f:
+    with open(config_path) as f:
         config = json.load(f)
 
-    if 'entities' not in config:
-        raise ValueError("Invalid entities_config.json: missing 'entities' key")
+    if "entities" not in config:
+        msg = "Invalid entities_config.json: missing 'entities' key"
+        raise ValueError(msg)
 
-    entities = config['entities']
+    entities = config["entities"]
     if not isinstance(entities, list):
-        raise ValueError("Invalid entities_config.json: 'entities' must be a list")
+        msg = "Invalid entities_config.json: 'entities' must be a list"
+        raise ValueError(msg)
 
     entity_names = []
     for entity in entities:
-        if not isinstance(entity, dict) or 'name' not in entity:
-            raise ValueError(f"Invalid entity entry: {entity}")
-        entity_names.append(entity['name'])
+        if not isinstance(entity, dict) or "name" not in entity:
+            msg = f"Invalid entity entry: {entity}"
+            raise ValueError(msg)
+        entity_names.append(entity["name"])
 
     return entity_names
 
 
-def load_entity_configs(path: str = 'entities_config.json') -> List[EntityConfig]:
+def load_entity_configs(path: str = "entities_config.json") -> list[EntityConfig]:
     """
     Load full entity configurations from entities_config.json.
 
@@ -142,34 +153,40 @@ def load_entity_configs(path: str = 'entities_config.json') -> List[EntityConfig
     config_path = Path(path)
 
     if not config_path.exists():
-        raise FileNotFoundError(f"Entity configuration file not found: {path}")
+        msg = f"Entity configuration file not found: {path}"
+        raise FileNotFoundError(msg)
 
-    with open(config_path, 'r') as f:
+    with open(config_path) as f:
         config = json.load(f)
 
-    if 'entities' not in config:
-        raise ValueError("Invalid entities_config.json: missing 'entities' key")
+    if "entities" not in config:
+        msg = "Invalid entities_config.json: missing 'entities' key"
+        raise ValueError(msg)
 
-    entities = config['entities']
+    entities = config["entities"]
     if not isinstance(entities, list):
-        raise ValueError("Invalid entities_config.json: 'entities' must be a list")
+        msg = "Invalid entities_config.json: 'entities' must be a list"
+        raise ValueError(msg)
 
     entity_configs = []
     for entity in entities:
         if not isinstance(entity, dict):
-            raise ValueError(f"Invalid entity entry: {entity}")
+            msg = f"Invalid entity entry: {entity}"
+            raise ValueError(msg)
 
-        name = entity.get('name', '')
+        name = entity.get("name", "")
 
         # Auto-pluralize if api_name not specified
         # Simple rule: add 's' to the end
-        api_name = entity.get('api_name', name + 's' if name else '')
+        api_name = entity.get("api_name", name + "s" if name else "")
 
-        entity_configs.append(EntityConfig(
-            name=name,
-            api_name=api_name,
-            filtered=entity.get('filtered', False),
-            description=entity.get('description', '')
-        ))
+        entity_configs.append(
+            EntityConfig(
+                name=name,
+                api_name=api_name,
+                filtered=entity.get("filtered", False),
+                description=entity.get("description", ""),
+            ),
+        )
 
     return entity_configs

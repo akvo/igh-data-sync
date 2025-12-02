@@ -12,36 +12,38 @@ Exit codes:
     0 - Validation passed (no errors)
     1 - Validation failed (errors detected)
 """
-import sys
-import asyncio
+
 import argparse
-from lib.config import load_config, load_entities
+import asyncio
+import sys
+
 from lib.auth import DataverseAuth
+from lib.config import load_config, load_entities
 from lib.dataverse_client import DataverseClient
-from lib.validation.dataverse_schema import DataverseSchemaFetcher
 from lib.validation.database_schema import DatabaseSchemaQuery
-from lib.validation.schema_comparer import SchemaComparer
+from lib.validation.dataverse_schema import DataverseSchemaFetcher
 from lib.validation.report_generator import ReportGenerator
+from lib.validation.schema_comparer import SchemaComparer
 
 
 async def main():
     """Main validation workflow."""
     # Parse command-line arguments
-    parser = argparse.ArgumentParser(description='Validate Dataverse schema against database')
+    parser = argparse.ArgumentParser(description="Validate Dataverse schema against database")
     parser.add_argument(
-        '--db-type',
-        choices=['sqlite', 'postgresql'],
-        help='Database type (default: auto-detect from config)'
+        "--db-type",
+        choices=["sqlite", "postgresql"],
+        help="Database type (default: auto-detect from config)",
     )
     parser.add_argument(
-        '--json-report',
-        default='schema_validation_report.json',
-        help='Path for JSON report (default: schema_validation_report.json)'
+        "--json-report",
+        default="schema_validation_report.json",
+        help="Path for JSON report (default: schema_validation_report.json)",
     )
     parser.add_argument(
-        '--md-report',
-        default='schema_validation_report.md',
-        help='Path for Markdown report (default: schema_validation_report.md)'
+        "--md-report",
+        default="schema_validation_report.md",
+        help="Path for Markdown report (default: schema_validation_report.md)",
     )
     args = parser.parse_args()
 
@@ -53,23 +55,20 @@ async def main():
         # [1/6] Load Configuration
         print("\n[1/6] Loading configuration...")
         config = load_config()
-        entities = load_entities('entities_config.json')
-        print(f"✓ Loaded configuration")
+        entities = load_entities("entities_config.json")
+        print("✓ Loaded configuration")
         print(f"  - API URL: {config.api_url}")
         print(f"  - Entities to check: {len(entities)}")
 
         # Determine database type
-        if args.db_type:
-            db_type = args.db_type
-        else:
-            db_type = config.get_db_type()
+        db_type = args.db_type or config.get_db_type()
         print(f"  - Database type: {db_type}")
 
         # [2/6] Authenticate with Dataverse
         print("\n[2/6] Authenticating with Dataverse...")
         auth = DataverseAuth(config)
         token = auth.authenticate()
-        print(f"✓ Successfully authenticated")
+        print("✓ Successfully authenticated")
         print(f"  - Tenant ID: {auth.tenant_id}")
 
         # [3/6] Fetch Dataverse Schemas
@@ -100,7 +99,7 @@ async def main():
             differences,
             dataverse_schemas,
             database_schemas,
-            output_path=args.json_report
+            output_path=args.json_report,
         )
 
         # Generate Markdown report
@@ -108,15 +107,11 @@ async def main():
             differences,
             dataverse_schemas,
             database_schemas,
-            output_path=args.md_report
+            output_path=args.md_report,
         )
 
         # Print summary and get pass/fail status
-        passed = reporter.print_summary(
-            differences,
-            dataverse_schemas,
-            database_schemas
-        )
+        passed = reporter.print_summary(differences, dataverse_schemas, database_schemas)
 
         # Exit with appropriate code
         sys.exit(0 if passed else 1)
@@ -127,9 +122,10 @@ async def main():
     except Exception as e:
         print(f"\n❌ ERROR: {e}", file=sys.stderr)
         import traceback
+
         traceback.print_exc()
         sys.exit(1)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     asyncio.run(main())

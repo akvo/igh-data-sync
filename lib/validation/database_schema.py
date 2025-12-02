@@ -1,14 +1,16 @@
 """Query database schemas from SQLite or PostgreSQL."""
+
 import sqlite3
-from typing import Dict, List
-from ..type_mapping import TableSchema, ColumnMetadata, ForeignKeyMetadata
+from typing import Optional
+
 from ..config import Config
+from ..type_mapping import ColumnMetadata, ForeignKeyMetadata, TableSchema
 
 
 class DatabaseSchemaQuery:
     """Queries database schemas from SQLite or PostgreSQL."""
 
-    def __init__(self, config: Config, db_type: str = None):
+    def __init__(self, config: Config, db_type: Optional[str] = None):
         """
         Initialize database schema query.
 
@@ -19,7 +21,7 @@ class DatabaseSchemaQuery:
         self.config = config
         self.db_type = db_type or config.get_db_type()
 
-    def query_all_schemas(self, entity_names: List[str]) -> Dict[str, TableSchema]:
+    def query_all_schemas(self, entity_names: list[str]) -> dict[str, TableSchema]:
         """
         Query schemas for all specified entities.
 
@@ -32,14 +34,15 @@ class DatabaseSchemaQuery:
         Raises:
             RuntimeError: If database query fails
         """
-        if self.db_type == 'sqlite':
+        if self.db_type == "sqlite":
             return self._query_sqlite_schemas(entity_names)
-        elif self.db_type in ('postgresql', 'postgres'):
+        elif self.db_type in ("postgresql", "postgres"):
             return self._query_postgresql_schemas(entity_names)
         else:
-            raise ValueError(f"Unsupported database type: {self.db_type}")
+            msg = f"Unsupported database type: {self.db_type}"
+            raise ValueError(msg)
 
-    def _query_sqlite_schemas(self, entity_names: List[str]) -> Dict[str, TableSchema]:
+    def _query_sqlite_schemas(self, entity_names: list[str]) -> dict[str, TableSchema]:
         """
         Query schemas from SQLite database using PRAGMA commands.
 
@@ -50,7 +53,8 @@ class DatabaseSchemaQuery:
             Dict mapping table name to TableSchema
         """
         if not self.config.sqlite_db_path:
-            raise RuntimeError("No SQLite database path configured")
+            msg = "No SQLite database path configured"
+            raise RuntimeError(msg)
 
         try:
             conn = sqlite3.connect(self.config.sqlite_db_path)
@@ -62,7 +66,7 @@ class DatabaseSchemaQuery:
                 # Check if table exists
                 cursor.execute(
                     "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
-                    (entity_name,)
+                    (entity_name,),
                 )
                 if not cursor.fetchone():
                     # Table doesn't exist
@@ -76,13 +80,8 @@ class DatabaseSchemaQuery:
                     col_name = row[1]
                     col_type = row[2]
                     not_null = row[3] == 1
-                    is_pk = row[5] == 1
 
-                    column = ColumnMetadata(
-                        name=col_name,
-                        db_type=col_type,
-                        nullable=not not_null
-                    )
+                    column = ColumnMetadata(name=col_name, db_type=col_type, nullable=not not_null)
                     columns.append(column)
 
                 # Get primary key (from pk column in table_info)
@@ -101,7 +100,7 @@ class DatabaseSchemaQuery:
                     fk = ForeignKeyMetadata(
                         column=row[3],
                         referenced_table=row[2],
-                        referenced_column=row[4]
+                        referenced_column=row[4],
                     )
                     foreign_keys.append(fk)
 
@@ -109,7 +108,7 @@ class DatabaseSchemaQuery:
                     entity_name=entity_name,
                     columns=columns,
                     primary_key=primary_key,
-                    foreign_keys=foreign_keys
+                    foreign_keys=foreign_keys,
                 )
 
                 schemas[entity_name] = schema
@@ -118,9 +117,10 @@ class DatabaseSchemaQuery:
             return schemas
 
         except sqlite3.Error as e:
-            raise RuntimeError(f"SQLite query failed: {e}")
+            msg = f"SQLite query failed: {e}"
+            raise RuntimeError(msg) from e
 
-    def _query_postgresql_schemas(self, entity_names: List[str]) -> Dict[str, TableSchema]:
+    def _query_postgresql_schemas(self, entity_names: list[str]) -> dict[str, TableSchema]:
         """
         Query schemas from PostgreSQL database using information_schema.
 
@@ -133,12 +133,14 @@ class DatabaseSchemaQuery:
         try:
             import psycopg2
         except ImportError:
+            msg = "psycopg2 not installed. Install with: pip install psycopg2-binary"
             raise RuntimeError(
-                "psycopg2 not installed. Install with: pip install psycopg2-binary"
-            )
+                msg,
+            ) from None
 
         if not self.config.postgres_connection_string:
-            raise RuntimeError("No PostgreSQL connection string configured")
+            msg = "No PostgreSQL connection string configured"
+            raise RuntimeError(msg)
 
         try:
             conn = psycopg2.connect(self.config.postgres_connection_string)
@@ -154,7 +156,7 @@ class DatabaseSchemaQuery:
                     FROM information_schema.tables
                     WHERE table_name = %s AND table_schema = 'public'
                     """,
-                    (entity_name,)
+                    (entity_name,),
                 )
                 if not cursor.fetchone():
                     # Table doesn't exist
@@ -169,20 +171,20 @@ class DatabaseSchemaQuery:
                     WHERE table_name = %s AND table_schema = 'public'
                     ORDER BY ordinal_position
                     """,
-                    (entity_name,)
+                    (entity_name,),
                 )
 
                 for row in cursor.fetchall():
                     col_name = row[0]
                     col_type = row[1]
-                    nullable = row[2] == 'YES'
+                    nullable = row[2] == "YES"
                     max_length = row[3]
 
                     column = ColumnMetadata(
                         name=col_name,
                         db_type=col_type,
                         nullable=nullable,
-                        max_length=max_length
+                        max_length=max_length,
                     )
                     columns.append(column)
 
@@ -198,7 +200,7 @@ class DatabaseSchemaQuery:
                         AND tc.constraint_type = 'PRIMARY KEY'
                         AND tc.table_schema = 'public'
                     """,
-                    (entity_name,)
+                    (entity_name,),
                 )
                 pk_row = cursor.fetchone()
                 if pk_row:
@@ -223,14 +225,14 @@ class DatabaseSchemaQuery:
                         AND tc.table_name = %s
                         AND tc.table_schema = 'public'
                     """,
-                    (entity_name,)
+                    (entity_name,),
                 )
 
                 for row in cursor.fetchall():
                     fk = ForeignKeyMetadata(
                         column=row[0],
                         referenced_table=row[1],
-                        referenced_column=row[2]
+                        referenced_column=row[2],
                     )
                     foreign_keys.append(fk)
 
@@ -238,7 +240,7 @@ class DatabaseSchemaQuery:
                     entity_name=entity_name,
                     columns=columns,
                     primary_key=primary_key,
-                    foreign_keys=foreign_keys
+                    foreign_keys=foreign_keys,
                 )
 
                 schemas[entity_name] = schema
@@ -247,4 +249,5 @@ class DatabaseSchemaQuery:
             return schemas
 
         except Exception as e:
-            raise RuntimeError(f"PostgreSQL query failed: {e}")
+            msg = f"PostgreSQL query failed: {e}"
+            raise RuntimeError(msg) from e

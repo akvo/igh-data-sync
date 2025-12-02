@@ -1,8 +1,10 @@
 """SQLite database operations for sync."""
-import sqlite3
+
 import json
-from datetime import datetime
-from typing import Dict, List, Optional, Any, Tuple
+import sqlite3
+from datetime import datetime, timezone
+from typing import Any, Optional
+
 from ..type_mapping import TableSchema
 
 
@@ -24,7 +26,7 @@ class DatabaseManager:
             self.conn.close()
             self.conn = None
 
-    def execute(self, sql: str, params: tuple = None) -> sqlite3.Cursor:
+    def execute(self, sql: str, params: Optional[tuple] = None) -> sqlite3.Cursor:
         """Execute SQL statement."""
         if not self.conn:
             self.connect()
@@ -43,7 +45,7 @@ class DatabaseManager:
         cursor = self.conn.cursor()
         cursor.execute(
             "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
-            (table_name,)
+            (table_name,),
         )
         return cursor.fetchone() is not None
 
@@ -80,12 +82,7 @@ class DatabaseManager:
             )
         """)
 
-    def upsert(
-        self,
-        table_name: str,
-        primary_key: str,
-        record: Dict[str, Any]
-    ) -> bool:
+    def upsert(self, table_name: str, primary_key: str, record: dict[str, Any]) -> bool:
         """
         Insert or replace record.
 
@@ -103,16 +100,13 @@ class DatabaseManager:
         # Check if exists
         pk_value = record.get(primary_key)
         cursor = self.conn.cursor()
-        cursor.execute(
-            f"SELECT 1 FROM {table_name} WHERE {primary_key} = ?",
-            (pk_value,)
-        )
+        cursor.execute(f"SELECT 1 FROM {table_name} WHERE {primary_key} = ?", (pk_value,))
         is_new = cursor.fetchone() is None
 
         # Build INSERT OR REPLACE
         columns = list(record.keys())
-        placeholders = ','.join(['?' for _ in columns])
-        column_list = ','.join(columns)
+        placeholders = ",".join(["?" for _ in columns])
+        column_list = ",".join(columns)
 
         sql = f"INSERT OR REPLACE INTO {table_name} ({column_list}) VALUES ({placeholders})"
         values = tuple(record[col] for col in columns)
@@ -127,8 +121,8 @@ class DatabaseManager:
         table_name: str,
         primary_key: str,
         schema: TableSchema,
-        api_records: List[Dict]
-    ) -> Tuple[int, int]:
+        api_records: list[dict],
+    ) -> tuple[int, int]:
         """
         Batch upsert records with json_response storage.
 
@@ -152,9 +146,9 @@ class DatabaseManager:
                     record[col.name] = api_record[col.name]
 
             # Add special columns
-            record['json_response'] = json.dumps(api_record)
-            record['sync_time'] = datetime.utcnow().isoformat()
-            record['valid_from'] = api_record.get('modifiedon')
+            record["json_response"] = json.dumps(api_record)
+            record["sync_time"] = datetime.now(timezone.utc).isoformat()
+            record["valid_from"] = api_record.get("modifiedon")
 
             # Upsert
             is_new = self.upsert(table_name, primary_key, record)
@@ -172,18 +166,21 @@ class DatabaseManager:
         cursor = self.conn.cursor()
         cursor.execute(
             "SELECT last_timestamp FROM _sync_state WHERE entity_name = ?",
-            (entity_name,)
+            (entity_name,),
         )
         row = cursor.fetchone()
         return row[0] if row else None
 
     def update_sync_timestamp(self, entity_name: str, timestamp: str, count: int):
         """Update last sync timestamp."""
-        self.execute("""
+        self.execute(
+            """
             INSERT OR REPLACE INTO _sync_state
             (entity_name, state, last_sync_time, last_timestamp, records_count)
             VALUES (?, 'completed', ?, ?, ?)
-        """, (entity_name, datetime.utcnow().isoformat(), timestamp, count))
+        """,
+            (entity_name, datetime.now(timezone.utc).isoformat(), timestamp, count),
+        )
 
     def query_distinct_values(self, table_name: str, column_name: str) -> set:
         """
@@ -206,13 +203,13 @@ class DatabaseManager:
         # Check if table exists
         cursor.execute(
             "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
-            (table_name,)
+            (table_name,),
         )
         if not cursor.fetchone():
             return set()
 
         # Query distinct values
         cursor.execute(
-            f"SELECT DISTINCT {column_name} FROM {table_name} WHERE {column_name} IS NOT NULL"
+            f"SELECT DISTINCT {column_name} FROM {table_name} WHERE {column_name} IS NOT NULL",
         )
         return {row[0] for row in cursor.fetchall()}

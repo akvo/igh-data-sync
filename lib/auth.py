@@ -1,8 +1,11 @@
 """OAuth authentication for Dataverse API."""
+
 import re
-import requests
 import time
 from typing import Optional
+
+import requests
+
 from .config import Config
 
 
@@ -39,29 +42,38 @@ class DataverseAuth:
             # Make unauthenticated request to trigger WWW-Authenticate header
             response = requests.get(
                 self.config.api_url,
-                headers={'Accept': 'application/json'},
-                timeout=10
+                headers={"Accept": "application/json"},
+                timeout=10,
             )
 
             # Look for WWW-Authenticate header
-            www_auth = response.headers.get('WWW-Authenticate', '')
+            www_auth = response.headers.get("WWW-Authenticate", "")
 
             if not www_auth:
-                raise RuntimeError("No WWW-Authenticate header found in response")
+                msg = "No WWW-Authenticate header found in response"
+                raise RuntimeError(msg)
 
             # Extract tenant ID from authorization_uri
             # Format: Bearer authorization_uri="https://login.microsoftonline.com/TENANT_ID/oauth2/authorize"
             # or: Bearer authorization_uri=https://login.microsoftonline.com/TENANT_ID/oauth2/authorize
-            match = re.search(r'authorization_uri="?[^"\s]*?/([0-9a-f\-]{36})/oauth2', www_auth, re.IGNORECASE)
+            match = re.search(
+                r'authorization_uri="?[^"\s]*?/([0-9a-f\-]{36})/oauth2',
+                www_auth,
+                re.IGNORECASE,
+            )
 
             if not match:
-                raise RuntimeError(f"Could not extract tenant ID from WWW-Authenticate header: {www_auth}")
+                msg = f"Could not extract tenant ID from WWW-Authenticate header: {www_auth}"
+                raise RuntimeError(
+                    msg,
+                )
 
             tenant_id = match.group(1)
             return tenant_id
 
         except requests.RequestException as e:
-            raise RuntimeError(f"Failed to discover tenant ID: {e}")
+            msg = f"Failed to discover tenant ID: {e}"
+            raise RuntimeError(msg) from e
 
     def authenticate(self) -> str:
         """
@@ -81,10 +93,10 @@ class DataverseAuth:
         token_url = f"https://login.microsoftonline.com/{self.tenant_id}/oauth2/v2.0/token"
 
         token_data = {
-            'client_id': self.config.client_id,
-            'client_secret': self.config.client_secret,
-            'scope': self.config.scope,
-            'grant_type': 'client_credentials'
+            "client_id": self.config.client_id,
+            "client_secret": self.config.client_secret,
+            "scope": self.config.scope,
+            "grant_type": "client_credentials",
         }
 
         try:
@@ -92,11 +104,12 @@ class DataverseAuth:
             response.raise_for_status()
 
             token_response = response.json()
-            access_token = token_response.get('access_token')
-            expires_in = token_response.get('expires_in', 3599)  # Default 1 hour
+            access_token = token_response.get("access_token")
+            expires_in = token_response.get("expires_in", 3599)  # Default 1 hour
 
             if not access_token:
-                raise RuntimeError("No access_token in authentication response")
+                msg = "No access_token in authentication response"
+                raise RuntimeError(msg)
 
             self.token = access_token
             self.token_expiry = time.time() + expires_in
@@ -104,7 +117,8 @@ class DataverseAuth:
             return access_token
 
         except requests.RequestException as e:
-            raise RuntimeError(f"Authentication failed: {e}")
+            msg = f"Authentication failed: {e}"
+            raise RuntimeError(msg) from e
 
     def get_token(self) -> str:
         """

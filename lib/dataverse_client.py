@@ -1,8 +1,17 @@
 """Async HTTP client for Dataverse API."""
-import aiohttp
+
 import asyncio
-from typing import Optional, Dict, Union, List
+from typing import Optional, Union
+
+import aiohttp
+
 from .config import Config
+
+# HTTP Status codes
+HTTP_OK = 200
+HTTP_UNAUTHORIZED = 401
+HTTP_TOO_MANY_REQUESTS = 429
+HTTP_SERVER_ERROR = 500
 
 
 class DataverseClient:
@@ -35,11 +44,7 @@ class DataverseClient:
         if self.session:
             await self.session.close()
 
-    async def get(
-        self,
-        endpoint: str,
-        params: Optional[Dict[str, str]] = None
-    ) -> Union[Dict, str]:
+    async def get(self, endpoint: str, params: Optional[dict[str, str]] = None) -> Union[dict, str]:
         """
         Make GET request to Dataverse API.
 
@@ -59,44 +64,41 @@ class DataverseClient:
             RuntimeError: If request fails
         """
         if not self.session:
-            raise RuntimeError("Client not initialized. Use 'async with' context manager.")
+            msg = "Client not initialized. Use 'async with' context manager."
+            raise RuntimeError(msg)
 
         # Construct full URL
-        if endpoint.startswith('http'):
-            url = endpoint
-        else:
-            url = f"{self.config.api_url}/{endpoint}"
+        url = endpoint if endpoint.startswith("http") else f"{self.config.api_url}/{endpoint}"
 
         # CRITICAL: Detect $metadata endpoint and set Accept header accordingly
-        if '$metadata' in endpoint:
-            accept_header = 'application/xml'
-        else:
-            accept_header = 'application/json'
+        accept_header = "application/xml" if "$metadata" in endpoint else "application/json"
 
         headers = {
-            'Authorization': f'Bearer {self.access_token}',
-            'Accept': accept_header,
-            'OData-MaxVersion': '4.0',
-            'OData-Version': '4.0'
+            "Authorization": f"Bearer {self.access_token}",
+            "Accept": accept_header,
+            "OData-MaxVersion": "4.0",
+            "OData-Version": "4.0",
         }
 
         try:
             async with self.session.get(url, headers=headers, params=params) as response:
                 # Check for errors
-                if response.status != 200:
+                if response.status != HTTP_OK:
                     error_text = await response.text()
+                    msg = f"API request failed with status {response.status}: {error_text}"
                     raise RuntimeError(
-                        f"API request failed with status {response.status}: {error_text}"
+                        msg,
                     )
 
                 # Return XML as text, JSON as dict
-                if accept_header == 'application/xml':
+                if accept_header == "application/xml":
                     return await response.text()
                 else:
                     return await response.json()
 
         except aiohttp.ClientError as e:
-            raise RuntimeError(f"HTTP request failed: {e}")
+            msg = f"HTTP request failed: {e}"
+            raise RuntimeError(msg) from e
 
     async def get_metadata(self) -> str:
         """
@@ -111,7 +113,7 @@ class DataverseClient:
         Raises:
             RuntimeError: If request fails
         """
-        return await self.get('$metadata')
+        return await self.get("$metadata")
 
     async def get_entity_count(self, entity_name: str) -> int:
         """
@@ -133,14 +135,15 @@ class DataverseClient:
         try:
             return int(count_str)
         except (ValueError, TypeError):
-            raise RuntimeError(f"Invalid count response: {count_str}")
+            msg = f"Invalid count response: {count_str}"
+            raise RuntimeError(msg) from None
 
     async def fetch_with_retry(
         self,
         url: str,
-        params: Optional[Dict[str, str]] = None,
-        attempt: int = 0
-    ) -> Dict:
+        params: Optional[dict[str, str]] = None,
+        attempt: int = 0,
+    ) -> dict:
         """
         Fetch data with exponential backoff retry logic.
 
@@ -163,18 +166,26 @@ class DataverseClient:
         """
         async with self.semaphore:  # Limit concurrent requests
             headers = {
-                'Authorization': f'Bearer {self.access_token}',
-                'Accept': 'application/json',
-                'OData-MaxVersion': '4.0',
-                'OData-Version': '4.0',
-                'Prefer': 'odata.maxpagesize=5000'  # Enable pagination
+                "Authorization": f"Bearer {self.access_token}",
+                "Accept": "application/json",
+                "OData-MaxVersion": "4.0",
+                "OData-Version": "4.0",
+                "Prefer": "odata.maxpagesize=5000",  # Enable pagination
             }
 
             try:
-                async with self.session.get(url, headers=headers, params=params, timeout=aiohttp.ClientTimeout(total=60)) as response:
+                async with self.session.get(
+                    url,
+                    headers=headers,
+                    params=params,
+                    timeout=aiohttp.ClientTimeout(total=60),
+                ) as response:
                     # Handle 429 rate limiting
-                    if response.status == 429:
-                        retry_after = response.headers.get('Retry-After', self.retry_delays[min(attempt, len(self.retry_delays) - 1)])
+                    if response.status == HTTP_TOO_MANY_REQUESTS:
+                        retry_after = response.headers.get(
+                            "Retry-After",
+                            self.retry_delays[min(attempt, len(self.retry_delays) - 1)],
+                        )
                         try:
                             wait_time = int(retry_after)
                         except ValueError:
@@ -184,25 +195,34 @@ class DataverseClient:
                             await asyncio.sleep(wait_time)
                             return await self.fetch_with_retry(url, params, attempt + 1)
                         else:
-                            raise RuntimeError(f"Rate limited after {attempt + 1} attempts")
+                            msg = f"Rate limited after {attempt + 1} attempts"
+                            raise RuntimeError(msg)
 
                     # Handle 401 unauthorized (token expired)
-                    if response.status == 401:
-                        raise RuntimeError("Token expired - need to re-authenticate")
+                    if response.status == HTTP_UNAUTHORIZED:
+                        msg = "Token expired - need to re-authenticate"
+                        raise RuntimeError(msg)
 
                     # Handle 5xx server errors with retry
-                    if response.status >= 500:
+                    if response.status >= HTTP_SERVER_ERROR:
                         if attempt < len(self.retry_delays):
                             await asyncio.sleep(self.retry_delays[attempt])
                             return await self.fetch_with_retry(url, params, attempt + 1)
                         else:
                             error_text = await response.text()
-                            raise RuntimeError(f"Server error after {attempt + 1} attempts: {response.status} - {error_text}")
+                            msg = (
+                                f"Server error after {attempt + 1} attempts: "
+                                f"{response.status} - {error_text}"
+                            )
+                            raise RuntimeError(
+                                msg,
+                            )
 
                     # Handle other errors
-                    if response.status != 200:
+                    if response.status != HTTP_OK:
                         error_text = await response.text()
-                        raise RuntimeError(f"API request failed: {response.status} - {error_text}")
+                        msg = f"API request failed: {response.status} - {error_text}"
+                        raise RuntimeError(msg)
 
                     return await response.json()
 
@@ -212,15 +232,16 @@ class DataverseClient:
                     await asyncio.sleep(self.retry_delays[attempt])
                     return await self.fetch_with_retry(url, params, attempt + 1)
                 else:
-                    raise RuntimeError(f"Network error after {attempt + 1} attempts: {e}")
+                    msg = f"Network error after {attempt + 1} attempts: {e}"
+                    raise RuntimeError(msg) from e
 
     async def fetch_all_pages(
         self,
         entity_name: str,
         orderby: Optional[str] = None,
         filter_query: Optional[str] = None,
-        select: Optional[str] = None
-    ) -> List[Dict]:
+        select: Optional[str] = None,
+    ) -> list[dict]:
         """
         Fetch all pages of data for an entity using @odata.nextLink pagination.
 
@@ -245,12 +266,17 @@ class DataverseClient:
         if orderby:
             try:
                 return await self._fetch_pages_with_orderby(
-                    entity_name, orderby, filter_query, select
+                    entity_name,
+                    orderby,
+                    filter_query,
+                    select,
                 )
             except RuntimeError as e:
                 # Check if it's an orderby-related 400 error
                 error_str = str(e).lower()
-                if '400' in error_str and ('orderby' in error_str or 'attribute' in error_str or 'principal' in error_str):
+                if "400" in error_str and (
+                    "orderby" in error_str or "attribute" in error_str or "principal" in error_str
+                ):
                     print(f"    ⚠️  Cannot order by {orderby}, fetching without orderby...")
                     # Fall through to no-orderby mode
                 else:
@@ -261,26 +287,24 @@ class DataverseClient:
         if orderby:  # Only warn if we had an orderby but it failed
             print(f"    ⚠️  Fetching {entity_name} without pagination (max 5000 records)")
 
-        return await self._fetch_pages_without_orderby(
-            entity_name, filter_query, select
-        )
+        return await self._fetch_pages_without_orderby(entity_name, filter_query, select)
 
     async def _fetch_pages_with_orderby(
         self,
         entity_name: str,
         orderby: str,
         filter_query: Optional[str] = None,
-        select: Optional[str] = None
-    ) -> List[Dict]:
+        select: Optional[str] = None,
+    ) -> list[dict]:
         """Fetch all pages with orderby for deterministic pagination."""
         all_records = []
 
         # Build initial query parameters
-        params = {'$orderby': orderby}
+        params = {"$orderby": orderby}
         if filter_query:
-            params['$filter'] = filter_query
+            params["$filter"] = filter_query
         if select:
-            params['$select'] = select
+            params["$select"] = select
 
         # Start with first page
         url = f"{self.config.api_url}/{entity_name}"
@@ -291,11 +315,11 @@ class DataverseClient:
             response = await self.fetch_with_retry(url, params if page_num == 1 else None)
 
             # Extract records
-            records = response.get('value', [])
+            records = response.get("value", [])
             all_records.extend(records)
 
             # Get next page URL
-            url = response.get('@odata.nextLink')
+            url = response.get("@odata.nextLink")
             page_num += 1
 
         return all_records
@@ -304,25 +328,28 @@ class DataverseClient:
         self,
         entity_name: str,
         filter_query: Optional[str] = None,
-        select: Optional[str] = None
-    ) -> List[Dict]:
+        select: Optional[str] = None,
+    ) -> list[dict]:
         """Fetch without orderby (fallback mode, limited to max 5000 records per page)."""
         # Build query parameters (no orderby)
         params = {}
         if filter_query:
-            params['$filter'] = filter_query
+            params["$filter"] = filter_query
         if select:
-            params['$select'] = select
+            params["$select"] = select
 
         # Fetch single page
         url = f"{self.config.api_url}/{entity_name}"
         response = await self.fetch_with_retry(url, params if params else None)
 
         # Extract records
-        records = response.get('value', [])
+        records = response.get("value", [])
 
         # Check if there's a next page (shouldn't be without orderby, but check anyway)
-        if response.get('@odata.nextLink'):
-            print(f"    ⚠️  Warning: {entity_name} has more records but orderby failed. Only first 5000 fetched.")
+        if response.get("@odata.nextLink"):
+            print(
+                f"    ⚠️  Warning: {entity_name} has more records but orderby failed. "
+                f"Only first 5000 fetched.",
+            )
 
         return records

@@ -1,15 +1,16 @@
 """Compare Dataverse and database schemas to detect differences."""
-from typing import Dict, List
+
 from ..type_mapping import (
-    TableSchema, ColumnMetadata, ForeignKeyMetadata,
-    SchemaDifference, normalize_db_type
+    SchemaDifference,
+    TableSchema,
+    normalize_db_type,
 )
 
 
 class SchemaComparer:
     """Compares Dataverse and database schemas to detect differences."""
 
-    def __init__(self, target_db: str = 'sqlite'):
+    def __init__(self, target_db: str = "sqlite"):
         """
         Initialize schema comparer.
 
@@ -20,9 +21,9 @@ class SchemaComparer:
 
     def compare_all(
         self,
-        dataverse_schemas: Dict[str, TableSchema],
-        database_schemas: Dict[str, TableSchema]
-    ) -> List[SchemaDifference]:
+        dataverse_schemas: dict[str, TableSchema],
+        database_schemas: dict[str, TableSchema],
+    ) -> list[SchemaDifference]:
         """
         Compare all schemas and detect differences.
 
@@ -60,41 +61,49 @@ class SchemaComparer:
 
     def _check_missing_tables(
         self,
-        dataverse_schemas: Dict[str, TableSchema],
-        database_schemas: Dict[str, TableSchema]
-    ) -> List[SchemaDifference]:
+        dataverse_schemas: dict[str, TableSchema],
+        database_schemas: dict[str, TableSchema],
+    ) -> list[SchemaDifference]:
         """Check for tables that exist in Dataverse but not in database."""
         differences = []
 
         for entity_name in dataverse_schemas:
             if entity_name not in database_schemas:
-                differences.append(SchemaDifference(
-                    entity=entity_name,
-                    issue_type='missing_table',
-                    severity='info',  # New entity - will be created
-                    description=f"Table '{entity_name}' exists in Dataverse but not in database",
-                    details={'entity_name': entity_name}
-                ))
+                differences.append(
+                    SchemaDifference(
+                        entity=entity_name,
+                        issue_type="missing_table",
+                        severity="info",  # New entity - will be created
+                        description=(
+                            f"Table '{entity_name}' exists in Dataverse but not in database"
+                        ),
+                        details={"entity_name": entity_name},
+                    ),
+                )
 
         return differences
 
     def _check_extra_tables(
         self,
-        dataverse_schemas: Dict[str, TableSchema],
-        database_schemas: Dict[str, TableSchema]
-    ) -> List[SchemaDifference]:
+        dataverse_schemas: dict[str, TableSchema],
+        database_schemas: dict[str, TableSchema],
+    ) -> list[SchemaDifference]:
         """Check for tables that exist in database but not in Dataverse."""
         differences = []
 
         for entity_name in database_schemas:
             if entity_name not in dataverse_schemas:
-                differences.append(SchemaDifference(
-                    entity=entity_name,
-                    issue_type='extra_table',
-                    severity='warning',
-                    description=f"Table '{entity_name}' exists in database but not in Dataverse schema",
-                    details={'entity_name': entity_name}
-                ))
+                differences.append(
+                    SchemaDifference(
+                        entity=entity_name,
+                        issue_type="extra_table",
+                        severity="warning",
+                        description=(
+                            f"Table '{entity_name}' exists in database but not in Dataverse schema"
+                        ),
+                        details={"entity_name": entity_name},
+                    ),
+                )
 
         return differences
 
@@ -102,8 +111,8 @@ class SchemaComparer:
         self,
         entity_name: str,
         dv_schema: TableSchema,
-        db_schema: TableSchema
-    ) -> List[SchemaDifference]:
+        db_schema: TableSchema,
+    ) -> list[SchemaDifference]:
         """Compare columns between Dataverse and database schemas."""
         differences = []
 
@@ -114,31 +123,34 @@ class SchemaComparer:
         # Check for missing columns
         for col_name, dv_col in dv_columns.items():
             if col_name not in db_columns:
-                differences.append(SchemaDifference(
-                    entity=entity_name,
-                    issue_type='missing_column',
-                    severity='info',  # New column in Dataverse - stored in json_response
-                    description=f"Column '{dv_col.name}' missing in database",
-                    details={
-                        'column_name': dv_col.name,
-                        'expected_type': dv_col.db_type,
-                        'edm_type': dv_col.edm_type
-                    }
-                ))
+                differences.append(
+                    SchemaDifference(
+                        entity=entity_name,
+                        issue_type="missing_column",
+                        severity="info",  # New column in Dataverse - stored in json_response
+                        description=f"Column '{dv_col.name}' missing in database",
+                        details={
+                            "column_name": dv_col.name,
+                            "expected_type": dv_col.db_type,
+                            "edm_type": dv_col.edm_type,
+                        },
+                    ),
+                )
 
         # Check for extra columns
         for col_name, db_col in db_columns.items():
             if col_name not in dv_columns:
-                differences.append(SchemaDifference(
-                    entity=entity_name,
-                    issue_type='extra_column',
-                    severity='warning',
-                    description=f"Column '{db_col.name}' exists in database but not in Dataverse",
-                    details={
-                        'column_name': db_col.name,
-                        'actual_type': db_col.db_type
-                    }
-                ))
+                differences.append(
+                    SchemaDifference(
+                        entity=entity_name,
+                        issue_type="extra_column",
+                        severity="warning",
+                        description=(
+                            f"Column '{db_col.name}' exists in database but not in Dataverse"
+                        ),
+                        details={"column_name": db_col.name, "actual_type": db_col.db_type},
+                    ),
+                )
 
         # Check for type mismatches in existing columns
         for col_name in dv_columns:
@@ -151,34 +163,38 @@ class SchemaComparer:
                 db_type_normalized = normalize_db_type(db_col.db_type, self.target_db)
 
                 if dv_type_normalized != db_type_normalized:
-                    differences.append(SchemaDifference(
-                        entity=entity_name,
-                        issue_type='type_mismatch',
-                        severity='error',
-                        description=f"Column '{dv_col.name}' type mismatch",
-                        details={
-                            'column_name': dv_col.name,
-                            'expected_type': dv_col.db_type,
-                            'actual_type': db_col.db_type,
-                            'expected_normalized': dv_type_normalized,
-                            'actual_normalized': db_type_normalized,
-                            'edm_type': dv_col.edm_type
-                        }
-                    ))
+                    differences.append(
+                        SchemaDifference(
+                            entity=entity_name,
+                            issue_type="type_mismatch",
+                            severity="error",
+                            description=f"Column '{dv_col.name}' type mismatch",
+                            details={
+                                "column_name": dv_col.name,
+                                "expected_type": dv_col.db_type,
+                                "actual_type": db_col.db_type,
+                                "expected_normalized": dv_type_normalized,
+                                "actual_normalized": db_type_normalized,
+                                "edm_type": dv_col.edm_type,
+                            },
+                        ),
+                    )
 
                 # Check nullable mismatch (less severe)
                 if dv_col.nullable != db_col.nullable:
-                    differences.append(SchemaDifference(
-                        entity=entity_name,
-                        issue_type='nullable_mismatch',
-                        severity='warning',
-                        description=f"Column '{dv_col.name}' nullable mismatch",
-                        details={
-                            'column_name': dv_col.name,
-                            'expected_nullable': dv_col.nullable,
-                            'actual_nullable': db_col.nullable
-                        }
-                    ))
+                    differences.append(
+                        SchemaDifference(
+                            entity=entity_name,
+                            issue_type="nullable_mismatch",
+                            severity="warning",
+                            description=f"Column '{dv_col.name}' nullable mismatch",
+                            details={
+                                "column_name": dv_col.name,
+                                "expected_nullable": dv_col.nullable,
+                                "actual_nullable": db_col.nullable,
+                            },
+                        ),
+                    )
 
         return differences
 
@@ -186,8 +202,8 @@ class SchemaComparer:
         self,
         entity_name: str,
         dv_schema: TableSchema,
-        db_schema: TableSchema
-    ) -> List[SchemaDifference]:
+        db_schema: TableSchema,
+    ) -> list[SchemaDifference]:
         """Compare primary keys between Dataverse and database schemas."""
         differences = []
 
@@ -196,16 +212,18 @@ class SchemaComparer:
         db_pk = db_schema.primary_key.lower() if db_schema.primary_key else None
 
         if dv_pk != db_pk:
-            differences.append(SchemaDifference(
-                entity=entity_name,
-                issue_type='pk_mismatch',
-                severity='error',
-                description=f"Primary key mismatch",
-                details={
-                    'expected_pk': dv_schema.primary_key,
-                    'actual_pk': db_schema.primary_key
-                }
-            ))
+            differences.append(
+                SchemaDifference(
+                    entity=entity_name,
+                    issue_type="pk_mismatch",
+                    severity="error",
+                    description="Primary key mismatch",
+                    details={
+                        "expected_pk": dv_schema.primary_key,
+                        "actual_pk": db_schema.primary_key,
+                    },
+                ),
+            )
 
         return differences
 
@@ -213,8 +231,8 @@ class SchemaComparer:
         self,
         entity_name: str,
         dv_schema: TableSchema,
-        db_schema: TableSchema
-    ) -> List[SchemaDifference]:
+        db_schema: TableSchema,
+    ) -> list[SchemaDifference]:
         """Compare foreign keys between Dataverse and database schemas."""
         differences = []
 
@@ -225,46 +243,65 @@ class SchemaComparer:
         # Check for missing foreign keys
         for fk_col, dv_fk in dv_fks.items():
             if fk_col not in db_fks:
-                differences.append(SchemaDifference(
-                    entity=entity_name,
-                    issue_type='fk_missing',
-                    severity='warning',  # FKs are often optional in databases
-                    description=f"Foreign key on column '{dv_fk.column}' missing",
-                    details={
-                        'column': dv_fk.column,
-                        'expected_references': f"{dv_fk.referenced_table}.{dv_fk.referenced_column}"
-                    }
-                ))
+                differences.append(
+                    SchemaDifference(
+                        entity=entity_name,
+                        issue_type="fk_missing",
+                        severity="warning",  # FKs are often optional in databases
+                        description=f"Foreign key on column '{dv_fk.column}' missing",
+                        details={
+                            "column": dv_fk.column,
+                            "expected_references": (
+                                f"{dv_fk.referenced_table}.{dv_fk.referenced_column}"
+                            ),
+                        },
+                    ),
+                )
             else:
                 # FK exists, check if it references the correct table/column
                 db_fk = db_fks[fk_col]
 
-                if (dv_fk.referenced_table.lower() != db_fk.referenced_table.lower() or
-                    dv_fk.referenced_column.lower() != db_fk.referenced_column.lower()):
-                    differences.append(SchemaDifference(
-                        entity=entity_name,
-                        issue_type='fk_mismatch',
-                        severity='warning',
-                        description=f"Foreign key on column '{dv_fk.column}' references wrong table/column",
-                        details={
-                            'column': dv_fk.column,
-                            'expected_references': f"{dv_fk.referenced_table}.{dv_fk.referenced_column}",
-                            'actual_references': f"{db_fk.referenced_table}.{db_fk.referenced_column}"
-                        }
-                    ))
+                if (
+                    dv_fk.referenced_table.lower() != db_fk.referenced_table.lower()
+                    or dv_fk.referenced_column.lower() != db_fk.referenced_column.lower()
+                ):
+                    differences.append(
+                        SchemaDifference(
+                            entity=entity_name,
+                            issue_type="fk_mismatch",
+                            severity="warning",
+                            description=(
+                                f"Foreign key on column '{dv_fk.column}' "
+                                f"references wrong table/column"
+                            ),
+                            details={
+                                "column": dv_fk.column,
+                                "expected_references": (
+                                    f"{dv_fk.referenced_table}.{dv_fk.referenced_column}"
+                                ),
+                                "actual_references": (
+                                    f"{db_fk.referenced_table}.{db_fk.referenced_column}"
+                                ),
+                            },
+                        ),
+                    )
 
         # Check for extra foreign keys
         for fk_col, db_fk in db_fks.items():
             if fk_col not in dv_fks:
-                differences.append(SchemaDifference(
-                    entity=entity_name,
-                    issue_type='fk_extra',
-                    severity='info',
-                    description=f"Extra foreign key on column '{db_fk.column}'",
-                    details={
-                        'column': db_fk.column,
-                        'actual_references': f"{db_fk.referenced_table}.{db_fk.referenced_column}"
-                    }
-                ))
+                differences.append(
+                    SchemaDifference(
+                        entity=entity_name,
+                        issue_type="fk_extra",
+                        severity="info",
+                        description=f"Extra foreign key on column '{db_fk.column}'",
+                        details={
+                            "column": db_fk.column,
+                            "actual_references": (
+                                f"{db_fk.referenced_table}.{db_fk.referenced_column}"
+                            ),
+                        },
+                    ),
+                )
 
         return differences

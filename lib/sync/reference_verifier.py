@@ -2,47 +2,47 @@
 
 Checks for dangling foreign key references using LEFT JOIN queries.
 """
-from typing import Dict, List, Tuple
+
 from dataclasses import dataclass, field
-from .relationship_graph import RelationshipGraph
+
 from .database import DatabaseManager
+from .relationship_graph import RelationshipGraph
+
+# Maximum number of sample IDs to display in verification report
+MAX_SAMPLE_DISPLAY = 5
 
 
 @dataclass
 class VerificationIssue:
     """A single reference integrity issue."""
+
     table: str
     fk_column: str
     referenced_table: str
     dangling_count: int
     total_checked: int
-    sample_ids: List[str] = field(default_factory=list)
+    sample_ids: list[str] = field(default_factory=list)
 
 
 @dataclass
 class VerificationReport:
     """Report of reference integrity verification."""
+
     total_checks: int = 0
     total_issues: int = 0
-    issues: List[VerificationIssue] = field(default_factory=list)
+    issues: list[VerificationIssue] = field(default_factory=list)
 
     def __str__(self) -> str:
         """Format report for display."""
-        lines = [
-            "",
-            "=" * 60,
-            "Reference Verification Report",
-            "=" * 60,
-            ""
-        ]
+        lines = ["", "=" * 60, "Reference Verification Report", "=" * 60, ""]
 
         if not self.issues:
             lines.append("✓ All references valid!")
             lines.append("")
-            lines.append(f"Statistics:")
+            lines.append("Statistics:")
             lines.append(f"  Total references checked: {self.total_checks}")
-            lines.append(f"  Dangling references: 0")
-            lines.append(f"  Tables with issues: 0")
+            lines.append("  Dangling references: 0")
+            lines.append("  Tables with issues: 0")
         else:
             lines.append(f"Found {self.total_issues} reference integrity issue(s):")
             lines.append("")
@@ -50,17 +50,21 @@ class VerificationReport:
             for issue in self.issues:
                 lines.append(
                     f"✗ {issue.table}.{issue.fk_column} → {issue.referenced_table}: "
-                    f"{issue.dangling_count} dangling ({issue.total_checked} checked)"
+                    f"{issue.dangling_count} dangling ({issue.total_checked} checked)",
                 )
                 if issue.sample_ids:
-                    sample = ', '.join(f"'{id}'" for id in issue.sample_ids[:5])
-                    if len(issue.sample_ids) > 5:
-                        sample += f", ... ({len(issue.sample_ids) - 5} more)"
+                    sample = ", ".join(
+                        f"'{record_id}'" for record_id in issue.sample_ids[:MAX_SAMPLE_DISPLAY]
+                    )
+                    if len(issue.sample_ids) > MAX_SAMPLE_DISPLAY:
+                        sample += f", ... ({len(issue.sample_ids) - MAX_SAMPLE_DISPLAY} more)"
                     lines.append(f"  Missing IDs: [{sample}]")
 
             lines.append("")
-            lines.append(f"Summary: {len(self.issues)} table(s) with issues, "
-                        f"{self.total_issues} dangling references total")
+            lines.append(
+                f"Summary: {len(self.issues)} table(s) with issues, "
+                f"{self.total_issues} dangling references total",
+            )
 
         lines.append("=" * 60)
         return "\n".join(lines)
@@ -76,7 +80,7 @@ class ReferenceVerifier:
     def verify_references(
         self,
         db_manager: DatabaseManager,
-        relationship_graph: RelationshipGraph
+        relationship_graph: RelationshipGraph,
     ) -> VerificationReport:
         """
         Check for dangling references using LEFT JOIN queries.
@@ -108,7 +112,7 @@ class ReferenceVerifier:
             cursor = db_manager.conn.cursor()
             cursor.execute(
                 "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
-                (entity_api_name,)
+                (entity_api_name,),
             )
             if not cursor.fetchone():
                 continue
@@ -120,7 +124,7 @@ class ReferenceVerifier:
                 # Check if referenced table exists
                 cursor.execute(
                     "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
-                    (referenced_table,)
+                    (referenced_table,),
                 )
                 if not cursor.fetchone():
                     # Referenced table doesn't exist - skip (might be intentional)
@@ -151,7 +155,7 @@ class ReferenceVerifier:
 
                         # Count total references checked
                         cursor.execute(
-                            f"SELECT COUNT(*) FROM {entity_api_name} WHERE {fk_column} IS NOT NULL"
+                            f"SELECT COUNT(*) FROM {entity_api_name} WHERE {fk_column} IS NOT NULL",
                         )
                         total_checked = cursor.fetchone()[0]
 
@@ -161,7 +165,7 @@ class ReferenceVerifier:
                             referenced_table=referenced_table,
                             dangling_count=dangling_count,
                             total_checked=total_checked,
-                            sample_ids=sample_ids
+                            sample_ids=sample_ids,
                         )
                         report.issues.append(issue)
                         report.total_issues += dangling_count
@@ -197,4 +201,5 @@ class ReferenceVerifier:
         if columns:
             return columns[0][1]
 
-        raise ValueError(f"No columns found for table {table_name}")
+        msg = f"No columns found for table {table_name}"
+        raise ValueError(msg)

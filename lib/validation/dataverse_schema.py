@@ -1,14 +1,17 @@
 """Fetch and extract Dataverse entity schemas from $metadata."""
-from typing import Dict, List
-from ..type_mapping import TableSchema
+
 from ..dataverse_client import DataverseClient
+from ..type_mapping import TableSchema
 from .metadata_parser import MetadataParser
+
+# Maximum number of missing entities to display in warning message
+MAX_MISSING_ENTITIES_DISPLAY = 10
 
 
 class DataverseSchemaFetcher:
     """Fetches and extracts entity schemas from Dataverse $metadata."""
 
-    def __init__(self, client: DataverseClient, target_db: str = 'sqlite'):
+    def __init__(self, client: DataverseClient, target_db: str = "sqlite"):
         """
         Initialize schema fetcher.
 
@@ -20,10 +23,7 @@ class DataverseSchemaFetcher:
         self.target_db = target_db
         self.parser = MetadataParser(target_db=target_db)
 
-    async def fetch_schemas_from_metadata(
-        self,
-        entity_names: List[str]
-    ) -> Dict[str, TableSchema]:
+    async def fetch_schemas_from_metadata(self, entity_names: list[str]) -> dict[str, TableSchema]:
         """
         Fetch schemas for specified entities from $metadata.
 
@@ -64,16 +64,16 @@ class DataverseSchemaFetcher:
 
         if missing_entities:
             print(f"Warning: {len(missing_entities)} entities not found in metadata:")
-            for entity in missing_entities[:10]:  # Show first 10
+            for entity in missing_entities[:MAX_MISSING_ENTITIES_DISPLAY]:
                 print(f"  - {entity}")
-            if len(missing_entities) > 10:
-                print(f"  ... and {len(missing_entities) - 10} more")
+            if len(missing_entities) > MAX_MISSING_ENTITIES_DISPLAY:
+                print(f"  ... and {len(missing_entities) - MAX_MISSING_ENTITIES_DISPLAY} more")
 
         print(f"Extracted schemas for {len(requested_schemas)} entities")
 
         return requested_schemas
 
-    async def fetch_all_schemas(self) -> Dict[str, TableSchema]:
+    async def fetch_all_schemas(self) -> dict[str, TableSchema]:
         """
         Fetch schemas for ALL entities in $metadata.
 

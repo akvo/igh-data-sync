@@ -1,0 +1,197 @@
+[project]
+name = "igh-clean-sync"
+version = "0.1.0"
+description = "Microsoft Dataverse integration toolkit with schema validation and data synchronization"
+requires-python = ">=3.9"
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+preview = true  # Enable preview rules for PLR0904 (too-many-public-methods)
+
+# Exclude generated files, virtual environments, and build artifacts
+exclude = [
+    ".git",
+    ".venv",
+    "venv",
+    "__pycache__",
+    "*.pyc",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".ruff_cache",
+    "build",
+    "dist",
+]
+
+[tool.ruff.lint]
+# Enable comprehensive rule sets
+select = [
+    "E",      # pycodestyle errors
+    "F",      # pyflakes
+    "W",      # pycodestyle warnings
+    "C90",    # mccabe complexity
+    "I",      # isort (import sorting)
+    "N",      # pep8-naming
+    "UP",     # pyupgrade (modernization)
+    "S",      # bandit (security)
+    "B",      # bugbear (common bugs)
+    "A",      # flake8-builtins
+    "C4",     # flake8-comprehensions
+    "PIE",    # flake8-pie
+    "T20",    # flake8-print
+    "SIM",    # flake8-simplify
+    "TCH",    # flake8-type-checking
+    "ARG",    # flake8-unused-arguments
+    "PTH",    # flake8-use-pathlib
+    "ERA",    # eradicate (commented-out code)
+    "PL",     # pylint (comprehensive checks)
+    "PERF",   # perflint (performance)
+    "RUF",    # ruff-specific rules
+    # NEW ADDITIONS (based on analysis):
+    "COM",    # flake8-commas (trailing commas for better git diffs)
+    "DTZ",    # flake8-datetimez (datetime timezone awareness)
+    "EM",     # flake8-errmsg (exception message formatting)
+    "TRY",    # tryceratops (exception handling best practices)
+]
+
+# Ignore specific rules that may be too strict initially
+ignore = [
+    "T20",     # Allow print statements (useful for CLI tools)
+    "S101",    # Allow assert statements (needed for tests)
+    "PTH123",  # Allow open() instead of Path.open() (more readable)
+    "TRY003",  # Allow long exception messages (can be addressed later)
+    "COM812",  # Trailing comma (conflicts with formatter)
+]
+
+# Allow auto-fixing for most rules
+fixable = ["ALL"]
+unfixable = []
+
+# Allow unused variables when prefixed with underscore
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+[tool.ruff.lint.mccabe]
+# Maximum cyclomatic complexity
+max-complexity = 10
+
+[tool.ruff.lint.pylint]
+# Method length and complexity limits
+max-statements = 50         # Max statements per function
+max-args = 6                # Max function parameters
+max-branches = 12           # Max branches in function
+max-returns = 6             # Max return statements
+max-bool-expr = 5           # Max boolean expressions in if statement
+max-public-methods = 20     # Max public methods per class (preview rule PLR0904)
+
+[tool.ruff.lint.per-file-ignores]
+# Tests can have additional flexibility
+"tests/**/*.py" = [
+    "S101",      # Allow assert statements in tests
+    "PLR2004",   # Allow magic values in tests
+    "ARG001",    # Allow unused function arguments (fixtures)
+    "PLR0913",   # Allow many arguments in test functions
+]
+
+# Main scripts can print to stdout
+"*.py" = ["T201"]  # Allow print in top-level scripts
+
+[tool.ruff.format]
+# Use Black-compatible formatting
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+[tool.mypy]
+# Gradual typing - start lenient, can be made stricter later
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false  # Start false, enable later
+check_untyped_defs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_optional = true
+strict_equality = true
+
+# Allow missing imports for third-party packages without stubs
+ignore_missing_imports = true
+
+# Show error codes and context
+show_error_codes = true
+show_column_numbers = true
+pretty = true
+
+[[tool.mypy.overrides]]
+# Stricter settings for lib/ modules (production code)
+module = "lib.*"
+warn_return_any = true
+disallow_untyped_defs = false  # Can enable later: true
+
+[[tool.mypy.overrides]]
+# Lenient settings for tests
+module = "tests.*"
+disallow_untyped_defs = false
+check_untyped_defs = true
+
+[tool.pytest.ini_options]
+# Test discovery and execution
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+
+# Output options
+addopts = [
+    "-ra",                    # Show summary of all test outcomes
+    "--strict-markers",       # Strict marker enforcement
+    "--strict-config",        # Strict config enforcement
+    "--showlocals",           # Show local variables in tracebacks
+    "-v",                     # Verbose output
+]
+
+# Asyncio configuration
+asyncio_mode = "auto"
+
+# Markers for organizing tests
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+    "unit: marks tests as unit tests",
+]
+
+[tool.coverage.run]
+# Coverage measurement configuration
+source = ["lib"]
+branch = true
+parallel = true
+omit = [
+    "tests/*",
+    "*/__pycache__/*",
+    "*.pyc",
+]
+
+[tool.coverage.report]
+# Coverage reporting configuration
+precision = 2
+show_missing = true
+skip_covered = false
+
+# Coverage thresholds - baseline: 27.52%, target: +10% = 38%
+fail_under = 38
+
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]
+
+[tool.coverage.html]
+directory = "htmlcov"

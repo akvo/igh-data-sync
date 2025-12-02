@@ -3,20 +3,22 @@
 Parses $metadata to build a bidirectional graph of entity relationships,
 enabling transitive closure ID extraction for filtered entities.
 """
-from typing import Dict, List, Set, Tuple
+
 from dataclasses import dataclass, field
-from ..validation.metadata_parser import MetadataParser
+
 from ..config import EntityConfig
+from ..validation.metadata_parser import MetadataParser
 
 
 @dataclass
 class EntityRelationships:
     """Relationships for a single entity."""
+
     # Entities this entity references (this_table.fk_column → other_table.pk)
-    references_to: List[Tuple[str, str]] = field(default_factory=list)  # [(table, fk_column), ...]
+    references_to: list[tuple[str, str]] = field(default_factory=list)  # [(table, fk_column), ...]
 
     # Entities that reference this entity (other_table.fk_column → this_table.pk)
-    referenced_by: List[Tuple[str, str]] = field(default_factory=list)  # [(table, fk_column), ...]
+    referenced_by: list[tuple[str, str]] = field(default_factory=list)  # [(table, fk_column), ...]
 
 
 class RelationshipGraph:
@@ -28,14 +30,14 @@ class RelationshipGraph:
 
     def __init__(self):
         """Initialize empty relationship graph."""
-        self.relationships: Dict[str, EntityRelationships] = {}
+        self.relationships: dict[str, EntityRelationships] = {}
 
     @classmethod
     def build_from_metadata(
         cls,
         metadata_xml: str,
-        entity_configs: List[EntityConfig]
-    ) -> 'RelationshipGraph':
+        entity_configs: list[EntityConfig],
+    ) -> "RelationshipGraph":
         """
         Build relationship graph from $metadata XML.
 
@@ -57,7 +59,7 @@ class RelationshipGraph:
         graph = cls()
 
         # Parse metadata
-        parser = MetadataParser(target_db='sqlite')
+        parser = MetadataParser(target_db="sqlite")
         schemas = parser.parse_metadata_xml(metadata_xml)
 
         # Build mapping: api_name → singular name (for Dataverse schema lookup)
@@ -68,7 +70,7 @@ class RelationshipGraph:
         name_to_api = {config.name: config.api_name for config in entity_configs}
 
         # Initialize relationships for all configured entities
-        for api_name in entity_map.keys():
+        for api_name in entity_map:
             graph.relationships[api_name] = EntityRelationships()
 
         # Build bidirectional relationships
@@ -91,18 +93,14 @@ class RelationshipGraph:
                     continue
 
                 # Record: this entity references the other entity
-                graph.relationships[api_name].references_to.append(
-                    (referenced_api_name, fk.column)
-                )
+                graph.relationships[api_name].references_to.append((referenced_api_name, fk.column))
 
                 # Record: other entity is referenced by this entity
-                graph.relationships[referenced_api_name].referenced_by.append(
-                    (api_name, fk.column)
-                )
+                graph.relationships[referenced_api_name].referenced_by.append((api_name, fk.column))
 
         return graph
 
-    def get_entities_that_reference(self, entity_api_name: str) -> List[Tuple[str, str]]:
+    def get_entities_that_reference(self, entity_api_name: str) -> list[tuple[str, str]]:
         """
         Get all entities that reference the given entity.
 
@@ -117,7 +115,7 @@ class RelationshipGraph:
             return []
         return self.relationships[entity_api_name].referenced_by
 
-    def get_entities_referenced_by(self, entity_api_name: str) -> List[Tuple[str, str]]:
+    def get_entities_referenced_by(self, entity_api_name: str) -> list[tuple[str, str]]:
         """
         Get all entities that this entity references.
 

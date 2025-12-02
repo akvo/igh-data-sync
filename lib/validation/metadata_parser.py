@@ -1,20 +1,18 @@
 """Parser for OData $metadata XML to extract entity schemas."""
-import xml.etree.ElementTree as ET
-from typing import Dict, List, Optional
-from ..type_mapping import (
-    TableSchema, ColumnMetadata, ForeignKeyMetadata,
-    map_edm_to_db_type
-)
 
+import xml.etree.ElementTree as ET
+from typing import Optional
+
+from ..type_mapping import ColumnMetadata, ForeignKeyMetadata, TableSchema, map_edm_to_db_type
 
 # OData namespace
-EDM_NAMESPACE = 'http://docs.oasis-open.org/odata/ns/edm'
+EDM_NAMESPACE = "http://docs.oasis-open.org/odata/ns/edm"
 
 
 class MetadataParser:
     """Parses OData $metadata XML to extract entity schemas."""
 
-    def __init__(self, target_db: str = 'sqlite'):
+    def __init__(self, target_db: str = "sqlite"):
         """
         Initialize metadata parser.
 
@@ -23,7 +21,7 @@ class MetadataParser:
         """
         self.target_db = target_db
 
-    def parse_metadata_xml(self, xml_content: str) -> Dict[str, TableSchema]:
+    def parse_metadata_xml(self, xml_content: str) -> dict[str, TableSchema]:
         """
         Parse $metadata XML and extract all entity schemas.
 
@@ -39,23 +37,24 @@ class MetadataParser:
         try:
             root = ET.fromstring(xml_content)
         except ET.ParseError as e:
-            raise ValueError(f"Failed to parse XML: {e}")
+            msg = f"Failed to parse XML: {e}"
+            raise ValueError(msg) from e
 
         # Find all EntityType elements
         schemas = {}
 
         # Namespace handling
-        ns = {'edm': EDM_NAMESPACE}
+        ns = {"edm": EDM_NAMESPACE}
 
         # Find all Schema elements
-        for schema_elem in root.findall('.//edm:Schema', ns):
+        for schema_elem in root.findall(".//edm:Schema", ns):
             # Find all EntityType elements within this schema
-            for entity_elem in schema_elem.findall('edm:EntityType', ns):
+            for entity_elem in schema_elem.findall("edm:EntityType", ns):
                 # Skip Abstract entities
-                if entity_elem.get('Abstract') == 'true':
+                if entity_elem.get("Abstract") == "true":
                     continue
 
-                entity_name = entity_elem.get('Name')
+                entity_name = entity_elem.get("Name")
                 if not entity_name:
                     continue
 
@@ -65,11 +64,7 @@ class MetadataParser:
 
         return schemas
 
-    def _parse_entity_type(
-        self,
-        entity_elem: ET.Element,
-        ns: Dict[str, str]
-    ) -> TableSchema:
+    def _parse_entity_type(self, entity_elem: ET.Element, ns: dict[str, str]) -> TableSchema:
         """
         Parse a single EntityType element.
 
@@ -80,7 +75,7 @@ class MetadataParser:
         Returns:
             TableSchema for this entity
         """
-        entity_name = entity_elem.get('Name')
+        entity_name = entity_elem.get("Name")
 
         # Parse primary key
         primary_key = self._parse_primary_key(entity_elem, ns)
@@ -96,14 +91,10 @@ class MetadataParser:
             entity_name=entity_name,
             columns=columns,
             primary_key=primary_key,
-            foreign_keys=foreign_keys
+            foreign_keys=foreign_keys,
         )
 
-    def _parse_primary_key(
-        self,
-        entity_elem: ET.Element,
-        ns: Dict[str, str]
-    ) -> Optional[str]:
+    def _parse_primary_key(self, entity_elem: ET.Element, ns: dict[str, str]) -> Optional[str]:
         """
         Parse primary key from Key/PropertyRef element.
 
@@ -114,21 +105,21 @@ class MetadataParser:
         Returns:
             Primary key column name, or None if not found
         """
-        key_elem = entity_elem.find('edm:Key', ns)
+        key_elem = entity_elem.find("edm:Key", ns)
         if key_elem is None:
             return None
 
-        prop_ref = key_elem.find('edm:PropertyRef', ns)
+        prop_ref = key_elem.find("edm:PropertyRef", ns)
         if prop_ref is None:
             return None
 
-        return prop_ref.get('Name')
+        return prop_ref.get("Name")
 
     def _parse_properties(
         self,
         entity_elem: ET.Element,
-        ns: Dict[str, str]
-    ) -> List[ColumnMetadata]:
+        ns: dict[str, str],
+    ) -> list[ColumnMetadata]:
         """
         Parse all Property elements to extract column definitions.
 
@@ -141,20 +132,20 @@ class MetadataParser:
         """
         columns = []
 
-        for prop_elem in entity_elem.findall('edm:Property', ns):
-            name = prop_elem.get('Name')
-            edm_type = prop_elem.get('Type')
+        for prop_elem in entity_elem.findall("edm:Property", ns):
+            name = prop_elem.get("Name")
+            edm_type = prop_elem.get("Type")
 
             if not name or not edm_type:
                 continue
 
             # Parse nullable attribute (default is true)
-            nullable_str = prop_elem.get('Nullable', 'true')
-            nullable = nullable_str.lower() == 'true'
+            nullable_str = prop_elem.get("Nullable", "true")
+            nullable = nullable_str.lower() == "true"
 
             # Parse max length
             max_length = None
-            max_length_str = prop_elem.get('MaxLength')
+            max_length_str = prop_elem.get("MaxLength")
             if max_length_str and max_length_str.isdigit():
                 max_length = int(max_length_str)
 
@@ -166,7 +157,7 @@ class MetadataParser:
                 db_type=db_type,
                 edm_type=edm_type,
                 nullable=nullable,
-                max_length=max_length
+                max_length=max_length,
             )
 
             columns.append(column)
@@ -176,10 +167,10 @@ class MetadataParser:
     def _parse_all_foreign_keys(
         self,
         entity_elem: ET.Element,
-        ns: Dict[str, str],
-        columns: List[ColumnMetadata],
-        primary_key: Optional[str]
-    ) -> List[ForeignKeyMetadata]:
+        ns: dict[str, str],
+        columns: list[ColumnMetadata],
+        primary_key: Optional[str],
+    ) -> list[ForeignKeyMetadata]:
         """
         Unified FK detection using NavigationProperty + column pattern matching.
 
@@ -211,31 +202,27 @@ class MetadataParser:
         foreign_keys = []
 
         # STEP 1: Parse NavigationProperty elements (authoritative source)
-        for nav_prop in entity_elem.findall('edm:NavigationProperty', ns):
+        for nav_prop in entity_elem.findall("edm:NavigationProperty", ns):
             # Find ReferentialConstraint
-            ref_constraint = nav_prop.find('edm:ReferentialConstraint', ns)
+            ref_constraint = nav_prop.find("edm:ReferentialConstraint", ns)
             if ref_constraint is None:
                 continue
 
-            column = ref_constraint.get('Property')
-            referenced_column = ref_constraint.get('ReferencedProperty')
+            column = ref_constraint.get("Property")
+            referenced_column = ref_constraint.get("ReferencedProperty")
 
             if not column or not referenced_column:
                 continue
 
             # Extract referenced table from Type attribute
-            # Format: "mscrm.systemuser" or "Collection(mscrm.systemuser)"
-            type_attr = nav_prop.get('Type', '')
+            type_attr = nav_prop.get("Type", "")
 
             # Remove "Collection(" wrapper if present
-            if type_attr.startswith('Collection('):
+            if type_attr.startswith("Collection("):
                 type_attr = type_attr[11:-1]  # Remove "Collection(" and ")"
 
             # Extract entity name (after namespace prefix)
-            if '.' in type_attr:
-                referenced_table = type_attr.split('.')[-1]
-            else:
-                referenced_table = type_attr
+            referenced_table = type_attr.split(".")[-1] if "." in type_attr else type_attr
 
             if not referenced_table:
                 continue
@@ -243,7 +230,7 @@ class MetadataParser:
             fk = ForeignKeyMetadata(
                 column=column,
                 referenced_table=referenced_table,
-                referenced_column=referenced_column
+                referenced_column=referenced_column,
             )
 
             foreign_keys.append(fk)
@@ -261,7 +248,7 @@ class MetadataParser:
 
             # Pattern 1: _fieldname_value (Dataverse lookup fields)
             # Example: _createdby_value, _primarycontactid_value, _owninguser_value
-            if col_name.startswith('_') and col_name.endswith('_value'):
+            if col_name.startswith("_") and col_name.endswith("_value"):
                 # Strip _ prefix and _value suffix to get field name
                 # _createdby_value → createdby
                 fieldname = col.name[1:-6]  # Remove _ and _value
@@ -269,7 +256,7 @@ class MetadataParser:
                 fk = ForeignKeyMetadata(
                     column=col.name,
                     referenced_table=fieldname,
-                    referenced_column=f"{fieldname}id"
+                    referenced_column=f"{fieldname}id",
                 )
 
                 foreign_keys.append(fk)
@@ -277,13 +264,13 @@ class MetadataParser:
 
             # Pattern 2: *id (junction table columns and simple references)
             # Example: accountid, vin_candidateid, vin_clinicaltrialid
-            if col_name.endswith('id'):
+            if col_name.endswith("id"):
                 # Skip primary key
                 if primary_key and col.name == primary_key:
                     continue
 
                 # Skip versionnumber
-                if col.name == 'versionnumber':
+                if col.name == "versionnumber":
                     continue
 
                 # Strip 'id' suffix to get referenced table name
@@ -294,7 +281,7 @@ class MetadataParser:
                 fk = ForeignKeyMetadata(
                     column=col.name,
                     referenced_table=referenced_table,
-                    referenced_column=col.name
+                    referenced_column=col.name,
                 )
 
                 foreign_keys.append(fk)

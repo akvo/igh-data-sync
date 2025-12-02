@@ -1,0 +1,12 @@
+[MASTER]
+# Only enable specific checks we need
+# We use Ruff for most linting, Pylint only for file length enforcement
+disable=all
+
+[FORMAT]
+# Maximum number of lines in a module
+max-module-lines=400
+
+[MESSAGES CONTROL]
+# Only enable the file length check
+enable=too-many-lines

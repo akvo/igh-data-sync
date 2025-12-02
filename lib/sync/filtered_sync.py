@@ -3,13 +3,13 @@
 Syncs only referenced records for filtered entities (accounts, contacts, systemusers)
 instead of downloading all records from Dataverse.
 """
-from typing import Dict, Set, List, Tuple
-from .relationship_graph import RelationshipGraph
-from .database import DatabaseManager
-from .sync_state import SyncStateManager
-from ..dataverse_client import DataverseClient
+
 from ..config import EntityConfig
+from ..dataverse_client import DataverseClient
 from ..type_mapping import TableSchema
+from .database import DatabaseManager
+from .relationship_graph import RelationshipGraph
+from .sync_state import SyncStateManager
 
 
 class FilteredSyncManager:
@@ -24,8 +24,8 @@ class FilteredSyncManager:
     def extract_filtered_ids(
         relationship_graph: RelationshipGraph,
         db_manager: DatabaseManager,
-        filtered_entities: List[str]
-    ) -> Dict[str, Set[str]]:
+        filtered_entities: list[str],
+    ) -> dict[str, set[str]]:
         """
         Extract IDs for filtered entities using transitive closure.
 
@@ -81,7 +81,10 @@ class FilteredSyncManager:
 
                     if new_count > old_count:
                         added = new_count - old_count
-                        print(f"      {entity_api_name}: +{added} from {table_name}.{fk_column} (total: {new_count})")
+                        print(
+                            f"      {entity_api_name}: +{added} from {table_name}.{fk_column} "
+                            f"(total: {new_count})",
+                        )
                         changed = True
 
             if not changed:
@@ -97,7 +100,7 @@ class FilteredSyncManager:
         self,
         client: DataverseClient,
         db_manager: DatabaseManager,
-        state_manager: SyncStateManager
+        state_manager: SyncStateManager,
     ):
         """
         Initialize filtered sync manager.
@@ -114,9 +117,9 @@ class FilteredSyncManager:
     async def sync_filtered_entity(
         self,
         entity: EntityConfig,
-        ids: Set[str],
-        schema: TableSchema
-    ) -> Tuple[int, int]:
+        ids: set[str],
+        schema: TableSchema,
+    ) -> tuple[int, int]:
         """
         Sync a filtered entity using batched $filter queries.
 
@@ -150,7 +153,8 @@ class FilteredSyncManager:
             # Get primary key from schema with fallback logic
             primary_key = schema.primary_key
             if not primary_key:
-                raise ValueError(f"No primary key found for {entity.api_name}")
+                msg = f"No primary key found for {entity.api_name}"
+                raise ValueError(msg)
 
             # Handle case where $metadata primary_key doesn't exist in actual columns
             # (e.g., systemuser has ownerid in metadata but systemuserid is the real PK)
@@ -159,16 +163,27 @@ class FilteredSyncManager:
                 # Try fallback: {entity_name}id
                 fallback_pk = f"{entity.name}id"
                 if fallback_pk in column_names:
-                    print(f"    ⚠️  Primary key '{primary_key}' not in columns, using '{fallback_pk}' instead")
+                    print(
+                        f"    ⚠️  Primary key '{primary_key}' not in columns, "
+                        f"using '{fallback_pk}' instead",
+                    )
                     primary_key = fallback_pk
                 else:
                     # Find any column ending with 'id' that's not a FK
-                    id_cols = [name for name in column_names if name.endswith('id') and not name.startswith('_')]
+                    id_cols = [
+                        name
+                        for name in column_names
+                        if name.endswith("id") and not name.startswith("_")
+                    ]
                     if id_cols:
-                        print(f"    ⚠️  Primary key '{primary_key}' not in columns, using '{id_cols[0]}' instead")
+                        print(
+                            f"    ⚠️  Primary key '{primary_key}' not in columns, "
+                            f"using '{id_cols[0]}' instead",
+                        )
                         primary_key = id_cols[0]
                     else:
-                        raise ValueError(f"Cannot find valid primary key for {entity.api_name}")
+                        msg = f"Cannot find valid primary key for {entity.api_name}"
+                        raise ValueError(msg)
 
             # Get last timestamp for incremental sync
             last_timestamp = self.db_manager.get_last_sync_timestamp(entity.api_name)
@@ -187,7 +202,7 @@ class FilteredSyncManager:
                 for id_val in ids:
                     cursor.execute(
                         f"SELECT 1 FROM {entity.api_name} WHERE {primary_key} = ? LIMIT 1",
-                        (id_val,)
+                        (id_val,),
                     )
                     if cursor.fetchone():
                         existing_ids.add(id_val)
@@ -200,11 +215,11 @@ class FilteredSyncManager:
 
             # Sync NEW IDs (without timestamp filter)
             for i in range(0, len(new_id_list), self.BATCH_SIZE):
-                batch = new_id_list[i:i + self.BATCH_SIZE]
+                batch = new_id_list[i : i + self.BATCH_SIZE]
 
                 # Build $filter query: "pk eq 'id1' or pk eq 'id2' or ..."
-                filter_parts = [f"{primary_key} eq '{id}'" for id in batch]
-                filter_query = ' or '.join(filter_parts)
+                filter_parts = [f"{primary_key} eq '{record_id}'" for record_id in batch]
+                filter_query = " or ".join(filter_parts)
 
                 # NO timestamp filter for new IDs!
 
@@ -212,26 +227,26 @@ class FilteredSyncManager:
                 records = await self.client.fetch_all_pages(
                     entity.api_name,
                     orderby=primary_key,
-                    filter_query=filter_query
+                    filter_query=filter_query,
                 )
 
                 all_records.extend(records)
 
             # Sync EXISTING IDs (with timestamp filter for incremental updates)
-            if existing_ids and last_timestamp and 'modifiedon' in [c.name for c in schema.columns]:
+            if existing_ids and last_timestamp and "modifiedon" in [c.name for c in schema.columns]:
                 for i in range(0, len(existing_id_list), self.BATCH_SIZE):
-                    batch = existing_id_list[i:i + self.BATCH_SIZE]
+                    batch = existing_id_list[i : i + self.BATCH_SIZE]
 
                     # Build $filter query with timestamp
-                    filter_parts = [f"{primary_key} eq '{id}'" for id in batch]
-                    filter_query = ' or '.join(filter_parts)
+                    filter_parts = [f"{primary_key} eq '{record_id}'" for record_id in batch]
+                    filter_query = " or ".join(filter_parts)
                     filter_query = f"({filter_query}) and modifiedon gt {last_timestamp}"
 
                     # Fetch records with pagination
                     records = await self.client.fetch_all_pages(
                         entity.api_name,
                         orderby=primary_key,
-                        filter_query=filter_query
+                        filter_query=filter_query,
                     )
 
                     all_records.extend(records)
@@ -242,17 +257,17 @@ class FilteredSyncManager:
                     entity.api_name,
                     primary_key,
                     schema,
-                    all_records
+                    all_records,
                 )
 
                 # Update timestamp
-                timestamps = [r['modifiedon'] for r in all_records if r.get('modifiedon')]
+                timestamps = [r["modifiedon"] for r in all_records if r.get("modifiedon")]
                 if timestamps:
                     max_timestamp = max(timestamps)
                     self.db_manager.update_sync_timestamp(
                         entity.api_name,
                         max_timestamp,
-                        len(all_records)
+                        len(all_records),
                     )
 
             # Complete sync

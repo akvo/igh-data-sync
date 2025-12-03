@@ -73,6 +73,18 @@
       "description": "All region records"
     },
     {
+      "name": "vin_capparameter",
+      "api_name": "vin_capparameters",
+      "filtered": false,
+      "description": "All CAP parameter records"
+    },
+    {
+      "name": "vin_routeofadministration",
+      "api_name": "vin_routeofadministrations",
+      "filtered": false,
+      "description": "Route of administration records"
+    },
+    {
       "name": "account",
       "api_name": "accounts",
       "filtered": true,
@@ -89,6 +101,12 @@
       "api_name": "systemusers",
       "filtered": true,
       "description": "Only systemusers referenced by other entities"
+    },
+    {
+      "name": "transactioncurrency",
+      "api_name": "transactioncurrencies",
+      "filtered": true,
+      "description": "Only currencies referenced by other entities"
     },
     {
       "name": "vin_vin_candidate_account",
@@ -140,9 +158,9 @@
     }
   ],
   "metadata": {
-    "total_entities": 23,
-    "filtered_entities": 3,
-    "unfiltered_entities": 20,
+    "total_entities": 26,
+    "filtered_entities": 4,
+    "unfiltered_entities": 22,
     "description": "Configuration for Dataverse entity sync - specifies which entities are synced in full vs filtered by foreign key relationships"
   }
 }

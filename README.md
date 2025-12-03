@@ -289,6 +289,49 @@ Lists entities to sync/validate with singular/plural name mapping:
 - `filtered`: If true, sync only records linked to already-synced entities
 - `description`: Human-readable description
 
+### Synced vs Excluded Entities
+
+The sync configuration includes **26 entities** organized into two categories:
+
+**Business entities (22 unfiltered):**
+- VIN domain entities: vin_candidate, vin_product, vin_disease, vin_clinicaltrial, vin_capparameter, vin_routeofadministration, etc.
+- Junction tables: candidate-account, candidate-systemuser, clinicaltrial-account, etc.
+
+**Filtered entities (4 filtered):**
+- Core CRM: account, contact, systemuser
+- Metadata: transactioncurrency
+
+**Excluded entities (not synced):**
+
+The following Dataverse entities are **intentionally excluded** from sync:
+
+**System/Infrastructure tables (18):**
+- `businessunit`, `organization`, `team`, `businessunitnewsarticle`
+- `importfile`, `importlog`, `importmap`, `transformationmapping`
+- `pluginassembly`, `plugintype`, `sdkmessage`, `sdkmessageprocessingstep`
+- `workflow`, `asyncoperation`, `bulkdeleteoperation`, `bulkdeleteoutput`
+- `duplicaterule`, `duplicateruledetection`
+
+**Identity/User Management (10):**
+- `systemuserroles`, `systemuserprofiles`, `userentityinstancedata`
+- `principal`, `principalobjectaccess`, `principalentitymap`
+- `role`, `roleprivileges`, `privilege`, `fieldpermission`
+
+**Address/Metadata (3):**
+- `customeraddress` (generic address entity)
+- `knowledgearticle`, `knowledgearticleviews`
+
+**Portal/Web (1):**
+- `adx_*` tables (Power Pages/Portal entities)
+
+**Rationale for exclusion:**
+- **System tables**: Infrastructure entities not relevant to business data
+- **Identity management**: User roles/permissions managed by Dataverse
+- **Portal entities**: Not applicable to this integration
+- **Generic addresses**: Using specific address1/2/3 entities instead
+
+These entities were identified by analyzing foreign key references in the synced entities against the full Dataverse $metadata. They can be added to `entities_config.json` if needed in the future.
+
 ## Usage
 
 ### Schema Validation

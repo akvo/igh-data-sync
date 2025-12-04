@@ -1,36 +1,13 @@
 """Basic tests for schema validator."""
 
-import tempfile
-from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from lib.config import Config, EntityConfig
+from lib.config import EntityConfig
 from lib.dataverse_client import DataverseClient
 from lib.sync.database import DatabaseManager
 from lib.validation.validator import validate_schema_before_sync
-
-
-@pytest.fixture
-def temp_db():
-    """Create temporary database for testing."""
-    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
-        db_path = f.name
-    yield db_path
-    Path(db_path).unlink(missing_ok=True)
-
-
-@pytest.fixture
-def test_config(temp_db):
-    """Create test configuration."""
-    return Config(
-        api_url="https://test.crm.dynamics.com/api/data/v9.2",
-        client_id="test-client-id",
-        client_secret="test-client-secret",
-        scope="https://test.crm.dynamics.com/.default",
-        sqlite_db_path=temp_db,
-    )
 
 
 @pytest.fixture
@@ -42,23 +19,6 @@ def test_entity():
         filtered=False,
         description="Test account entity",
     )
-
-
-@pytest.fixture
-def mock_metadata_xml():
-    """Mock $metadata XML."""
-    return """<?xml version="1.0"?>
-<edmx:Edmx Version="4.0" xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx">
-  <edmx:DataServices>
-    <Schema Namespace="Microsoft.Dynamics.CRM" xmlns="http://docs.oasis-open.org/odata/ns/edm">
-      <EntityType Name="account">
-        <Key><PropertyRef Name="accountid"/></Key>
-        <Property Name="accountid" Type="Edm.Guid" Nullable="false"/>
-        <Property Name="name" Type="Edm.String"/>
-      </EntityType>
-    </Schema>
-  </edmx:DataServices>
-</edmx:Edmx>"""
 
 
 class TestValidator:

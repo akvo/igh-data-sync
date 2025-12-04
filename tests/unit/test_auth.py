@@ -7,19 +7,6 @@ import pytest
 import responses
 
 from lib.auth import DataverseAuth
-from lib.config import Config
-
-
-@pytest.fixture
-def test_config():
-    """Create test configuration."""
-    return Config(
-        api_url="https://test.crm.dynamics.com/api/data/v9.2",
-        client_id="test-client-id",
-        client_secret="test-client-secret",
-        scope="https://test.crm.dynamics.com/.default",
-        sqlite_db_path="test.db",
-    )
 
 
 @pytest.fixture

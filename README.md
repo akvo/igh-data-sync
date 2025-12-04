@@ -127,17 +127,22 @@ Given this configuration:
 │       ├── filtered_sync.py     # Filtered entity transitive closure (NEW)
 │       ├── reference_verifier.py # FK integrity verification (NEW)
 │       └── relationship_graph.py # FK relationship graph (NEW)
-└── tests/                       # Test suite (67 tests, 60.20% coverage)
-    ├── test_auth.py             # OAuth authentication tests (NEW)
-    ├── test_dataverse_client.py # API client tests (NEW)
-    ├── test_integration_sync.py # True E2E sync tests (NEW)
-    ├── test_validator.py        # Pre-sync validation tests (NEW)
-    ├── test_type_mapping.py     # Type mapping tests
-    ├── test_metadata_parser.py  # XML parsing tests
-    ├── test_schema_comparer.py  # Schema comparison tests
-    ├── test_config.py           # Configuration tests
-    ├── test_database.py         # Database operations tests
-    └── helpers/                 # Test utilities (NEW)
+└── tests/                       # Test suite (67 tests, 60.26% coverage)
+    ├── conftest.py              # Shared test fixtures
+    ├── unit/                    # Unit tests (mirror lib/ structure)
+    │   ├── test_auth.py         # OAuth authentication tests
+    │   ├── test_config.py       # Configuration tests
+    │   ├── test_dataverse_client.py # API client tests
+    │   ├── test_type_mapping.py # Type mapping tests
+    │   ├── sync/
+    │   │   └── test_database.py # Database operations tests
+    │   └── validation/
+    │       ├── test_metadata_parser.py # XML parsing tests
+    │       ├── test_schema_comparer.py # Schema comparison tests
+    │       └── test_validator.py # Pre-sync validation tests
+    ├── e2e/                     # End-to-end integration tests
+    │   └── test_integration_sync.py # True E2E sync tests
+    └── helpers/                 # Test utilities
         ├── __init__.py
         └── fake_dataverse_client.py # Mock API client for E2E tests
 ```
@@ -207,11 +212,20 @@ pre-commit run --all-files
 # Run all tests
 pytest
 
+# Run unit tests only
+pytest tests/unit/
+
+# Run E2E tests only
+pytest tests/e2e/
+
 # Run with coverage report
 pytest --cov=lib --cov-report=term-missing
 
 # Run specific test file
-pytest tests/test_auth.py -v
+pytest tests/unit/test_auth.py -v
+
+# Run all validation tests
+pytest tests/unit/validation/ -v
 
 # Run tests matching pattern
 pytest -k "test_filtered_sync"
@@ -219,7 +233,7 @@ pytest -k "test_filtered_sync"
 
 **Test Statistics:**
 - 67 tests total
-- 60.20% code coverage
+- 60.26% code coverage
 - All tests passing
 
 ### Linting and Formatting
@@ -501,20 +515,23 @@ pytest --cov=lib --cov-report=term-missing tests/
 
 ### Test Coverage
 
-Current coverage: **60.20%** (67 tests passing)
+Current coverage: **60.26%** (67 tests passing)
 
 **Coverage by module:**
 - lib/auth.py: 96.77%
 - lib/dataverse_client.py: 50.00%
-- lib/sync/database.py: 90.99%
+- lib/sync/database.py: 91.89%
 - lib/sync/entity_sync.py: 57.50%
 - lib/sync/filtered_sync.py: 63.24%
 - lib/validation/validator.py: 84.51%
 - lib/type_mapping.py: 84.62%
 
 **Test types:**
-- **Unit tests**: Individual component testing (test_auth.py, test_config.py, etc.)
-- **E2E tests**: Full workflow testing with mocked APIs (test_integration_sync.py)
+- **Unit tests** (tests/unit/): Individual component testing
+  - tests/unit/test_auth.py, test_config.py, test_dataverse_client.py, test_type_mapping.py
+  - tests/unit/sync/test_database.py
+  - tests/unit/validation/test_metadata_parser.py, test_schema_comparer.py, test_validator.py
+- **E2E tests** (tests/e2e/): Full workflow testing with mocked APIs
   - Complete sync workflow
   - Incremental sync
   - Filtered sync with transitive closure
@@ -524,10 +541,10 @@ Current coverage: **60.20%** (67 tests passing)
 
 ```bash
 # Run single test file
-pytest tests/test_auth.py -v
+pytest tests/unit/test_auth.py -v
 
 # Run specific test
-pytest tests/test_integration_sync.py::TestE2ESync::test_filtered_sync_transitive_closure -v
+pytest tests/e2e/test_integration_sync.py::TestE2ESync::test_filtered_sync_transitive_closure -v
 
 # Run tests matching pattern
 pytest -k "filtered" -v
@@ -621,7 +638,7 @@ Example CI workflow:
 - ✅ Full JSON storage for schema evolution
 - ✅ Sync state tracking (_sync_state, _sync_log)
 - ✅ UPSERT operations (INSERT OR REPLACE)
-- ✅ 67 tests (60.20% coverage), all passing
+- ✅ 67 tests (60.26% coverage), all passing
 - ✅ Pre-commit hooks (ruff, pylint)
 - ✅ Type checking and linting
 

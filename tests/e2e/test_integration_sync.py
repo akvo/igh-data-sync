@@ -1,67 +1,14 @@
 """True end-to-end integration tests that call main workflow with mocked APIs."""
 
 import sqlite3
-import tempfile
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
-from lib.config import Config, EntityConfig
+from lib.config import EntityConfig
 from lib.sync.database import DatabaseManager
 from sync_dataverse import run_sync_workflow
 from tests.helpers.fake_dataverse_client import FakeDataverseClient
-
-
-@pytest.fixture
-def temp_db():
-    """Create temporary database for testing."""
-    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
-        db_path = f.name
-    yield db_path
-    Path(db_path).unlink(missing_ok=True)
-
-
-@pytest.fixture
-def test_config(temp_db):
-    """Create test configuration."""
-    return Config(
-        api_url="https://test.crm.dynamics.com/api/data/v9.2",
-        client_id="test-client-id",
-        client_secret="test-client-secret",
-        scope="https://test.crm.dynamics.com/.default",
-        sqlite_db_path=temp_db,
-    )
-
-
-@pytest.fixture
-def mock_metadata_xml():
-    """Sample metadata with multiple entities and relationships."""
-    return """<?xml version="1.0" encoding="utf-8"?>
-<edmx:Edmx Version="4.0" xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx">
-  <edmx:DataServices>
-    <Schema Namespace="Microsoft.Dynamics.CRM" xmlns="http://docs.oasis-open.org/odata/ns/edm">
-      <EntityType Name="account">
-        <Key><PropertyRef Name="accountid"/></Key>
-        <Property Name="accountid" Type="Edm.Guid" Nullable="false"/>
-        <Property Name="name" Type="Edm.String" MaxLength="160"/>
-        <Property Name="modifiedon" Type="Edm.DateTimeOffset"/>
-        <Property Name="createdon" Type="Edm.DateTimeOffset"/>
-      </EntityType>
-      <EntityType Name="contact">
-        <Key><PropertyRef Name="contactid"/></Key>
-        <Property Name="contactid" Type="Edm.Guid" Nullable="false"/>
-        <Property Name="fullname" Type="Edm.String" MaxLength="160"/>
-        <Property Name="emailaddress1" Type="Edm.String" MaxLength="100"/>
-        <Property Name="_parentcustomerid_value" Type="Edm.Guid"/>
-        <Property Name="modifiedon" Type="Edm.DateTimeOffset"/>
-        <NavigationProperty Name="parentcustomerid_account" Type="Microsoft.Dynamics.CRM.account">
-          <ReferentialConstraint Property="_parentcustomerid_value" ReferencedProperty="accountid"/>
-        </NavigationProperty>
-      </EntityType>
-    </Schema>
-  </edmx:DataServices>
-</edmx:Edmx>"""
 
 
 class TestE2ESync:

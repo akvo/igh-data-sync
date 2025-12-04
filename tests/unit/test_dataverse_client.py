@@ -3,26 +3,7 @@
 import pytest
 from aioresponses import aioresponses
 
-from lib.config import Config
 from lib.dataverse_client import DataverseClient
-
-
-@pytest.fixture
-def test_config():
-    """Create test configuration."""
-    return Config(
-        api_url="https://test.crm.dynamics.com/api/data/v9.2",
-        client_id="test-client-id",
-        client_secret="test-client-secret",
-        scope="https://test.crm.dynamics.com/.default",
-        sqlite_db_path="test.db",
-    )
-
-
-@pytest.fixture
-def test_token():
-    """Test access token."""
-    return "test-access-token-12345"
 
 
 class TestDataverseClient:

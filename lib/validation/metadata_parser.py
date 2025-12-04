@@ -1,6 +1,7 @@
 """Parser for OData $metadata XML to extract entity schemas."""
 
-import xml.etree.ElementTree as ET
+# S405: xml.etree is safe here - parsing trusted metadata from Microsoft Dataverse API, not user input
+import xml.etree.ElementTree as ET  # noqa: S405
 from typing import Optional
 
 from ..type_mapping import ColumnMetadata, ForeignKeyMetadata, TableSchema, map_edm_to_db_type
@@ -21,12 +22,18 @@ class MetadataParser:
         """
         self.target_db = target_db
 
-    def parse_metadata_xml(self, xml_content: str) -> dict[str, TableSchema]:
+    def parse_metadata_xml(
+        self,
+        xml_content: str,
+        option_set_fields_by_entity: Optional[dict[str, list[str]]] = None,
+    ) -> dict[str, TableSchema]:
         """
         Parse $metadata XML and extract all entity schemas.
 
         Args:
             xml_content: XML string from $metadata endpoint
+            option_set_fields_by_entity: Optional dict mapping entity name to list of
+                                         option set field names (from config file)
 
         Returns:
             Dict mapping entity name to TableSchema
@@ -35,7 +42,8 @@ class MetadataParser:
             ValueError: If XML is invalid or cannot be parsed
         """
         try:
-            root = ET.fromstring(xml_content)
+            # S314: xml_content is from trusted Microsoft Dataverse API, not user input
+            root = ET.fromstring(xml_content)  # noqa: S314
         except ET.ParseError as e:
             msg = f"Failed to parse XML: {e}"
             raise ValueError(msg) from e
@@ -58,19 +66,32 @@ class MetadataParser:
                 if not entity_name:
                     continue
 
-                # Parse this entity
-                table_schema = self._parse_entity_type(entity_elem, ns)
+                # Get option set fields for this entity (convert list to set)
+                option_set_fields = (
+                    set(option_set_fields_by_entity.get(entity_name, []))
+                    if option_set_fields_by_entity
+                    else set()
+                )
+
+                # Parse this entity with option set field info
+                table_schema = self._parse_entity_type(entity_elem, ns, option_set_fields)
                 schemas[entity_name] = table_schema
 
         return schemas
 
-    def _parse_entity_type(self, entity_elem: ET.Element, ns: dict[str, str]) -> TableSchema:
+    def _parse_entity_type(
+        self,
+        entity_elem: ET.Element,
+        ns: dict[str, str],
+        option_set_fields: Optional[set[str]] = None,
+    ) -> TableSchema:
         """
         Parse a single EntityType element.
 
         Args:
             entity_elem: EntityType XML element
             ns: XML namespace dict
+            option_set_fields: Optional set of field names that are option sets
 
         Returns:
             TableSchema for this entity
@@ -80,8 +101,8 @@ class MetadataParser:
         # Parse primary key
         primary_key = self._parse_primary_key(entity_elem, ns)
 
-        # Parse columns (properties)
-        columns = self._parse_properties(entity_elem, ns)
+        # Parse columns (properties) with option set field info
+        columns = self._parse_properties(entity_elem, ns, option_set_fields)
 
         # Parse foreign keys using unified detection
         # (NavigationProperty + pattern matching for _*_value and *id columns)
@@ -119,6 +140,7 @@ class MetadataParser:
         self,
         entity_elem: ET.Element,
         ns: dict[str, str],
+        option_set_fields: Optional[set[str]] = None,
     ) -> list[ColumnMetadata]:
         """
         Parse all Property elements to extract column definitions.
@@ -126,10 +148,14 @@ class MetadataParser:
         Args:
             entity_elem: EntityType XML element
             ns: XML namespace dict
+            option_set_fields: Optional set of field names that are option sets
 
         Returns:
             List of ColumnMetadata
         """
+        if option_set_fields is None:
+            option_set_fields = set()
+
         columns = []
 
         for prop_elem in entity_elem.findall("edm:Property", ns):
@@ -149,8 +175,16 @@ class MetadataParser:
             if max_length_str and max_length_str.isdigit():
                 max_length = int(max_length_str)
 
-            # Map to database type
-            db_type = map_edm_to_db_type(edm_type, self.target_db, max_length)
+            # Check if this field is in the option set config
+            is_option_set = name in option_set_fields
+
+            # Map to database type (with option set override)
+            db_type = map_edm_to_db_type(
+                edm_type,
+                self.target_db,
+                max_length,
+                is_option_set=is_option_set,
+            )
 
             column = ColumnMetadata(
                 name=name,
@@ -163,6 +197,51 @@ class MetadataParser:
             columns.append(column)
 
         return columns
+
+    def _extract_referenced_table_from_type(self, type_attr: str) -> str:
+        """Extract entity name from Type attribute (removes Collection wrapper)."""
+        # Remove "Collection(" wrapper if present
+        if type_attr.startswith("Collection("):
+            type_attr = type_attr[11:-1]
+        # Extract entity name (after namespace prefix)
+        return type_attr.split(".")[-1] if "." in type_attr else type_attr
+
+    def _detect_dataverse_lookup_fk(
+        self, col: ColumnMetadata, columns_with_fks: set
+    ) -> Optional[ForeignKeyMetadata]:
+        """Detect _fieldname_value pattern (Dataverse lookup fields)."""
+        if col.name in columns_with_fks:
+            return None
+        col_name = col.name.lower()
+        if col_name.startswith("_") and col_name.endswith("_value"):
+            fieldname = col.name[1:-6]  # Strip _ prefix and _value suffix
+            return ForeignKeyMetadata(
+                column=col.name,
+                referenced_table=fieldname,
+                referenced_column=f"{fieldname}id",
+            )
+        return None
+
+    def _detect_junction_table_fk(
+        self, col: ColumnMetadata, columns_with_fks: set, primary_key: Optional[str]
+    ) -> Optional[ForeignKeyMetadata]:
+        """Detect *id pattern (junction tables and simple references)."""
+        if col.name in columns_with_fks:
+            return None
+        col_name = col.name.lower()
+        if not col_name.endswith("id"):
+            return None
+        if primary_key and col.name == primary_key:
+            return None
+        if col.name == "versionnumber":
+            return None
+
+        referenced_table = col.name[:-2]  # Strip 'id' suffix
+        return ForeignKeyMetadata(
+            column=col.name,
+            referenced_table=referenced_table,
+            referenced_column=col.name,
+        )
 
     def _parse_all_foreign_keys(
         self,
@@ -203,87 +282,41 @@ class MetadataParser:
 
         # STEP 1: Parse NavigationProperty elements (authoritative source)
         for nav_prop in entity_elem.findall("edm:NavigationProperty", ns):
-            # Find ReferentialConstraint
             ref_constraint = nav_prop.find("edm:ReferentialConstraint", ns)
             if ref_constraint is None:
                 continue
 
             column = ref_constraint.get("Property")
             referenced_column = ref_constraint.get("ReferencedProperty")
-
             if not column or not referenced_column:
                 continue
 
-            # Extract referenced table from Type attribute
             type_attr = nav_prop.get("Type", "")
-
-            # Remove "Collection(" wrapper if present
-            if type_attr.startswith("Collection("):
-                type_attr = type_attr[11:-1]  # Remove "Collection(" and ")"
-
-            # Extract entity name (after namespace prefix)
-            referenced_table = type_attr.split(".")[-1] if "." in type_attr else type_attr
-
+            referenced_table = self._extract_referenced_table_from_type(type_attr)
             if not referenced_table:
                 continue
 
-            fk = ForeignKeyMetadata(
-                column=column,
-                referenced_table=referenced_table,
-                referenced_column=referenced_column,
+            foreign_keys.append(
+                ForeignKeyMetadata(
+                    column=column,
+                    referenced_table=referenced_table,
+                    referenced_column=referenced_column,
+                )
             )
 
-            foreign_keys.append(fk)
-
-        # STEP 2: Track which columns already have FK metadata
+        # STEP 2: Pattern-match remaining columns for inferred FKs
         columns_with_fks = {fk.column for fk in foreign_keys}
 
-        # STEP 3: Pattern-match remaining columns for inferred FKs
         for col in columns:
-            # Skip if this column already has FK metadata from NavigationProperty
-            if col.name in columns_with_fks:
+            # Try Dataverse pattern (_fieldname_value)
+            fk = self._detect_dataverse_lookup_fk(col, columns_with_fks)
+            if fk:
+                foreign_keys.append(fk)
                 continue
 
-            col_name = col.name.lower()
-
-            # Pattern 1: _fieldname_value (Dataverse lookup fields)
-            # Example: _createdby_value, _primarycontactid_value, _owninguser_value
-            if col_name.startswith("_") and col_name.endswith("_value"):
-                # Strip _ prefix and _value suffix to get field name
-                # _createdby_value → createdby
-                fieldname = col.name[1:-6]  # Remove _ and _value
-
-                fk = ForeignKeyMetadata(
-                    column=col.name,
-                    referenced_table=fieldname,
-                    referenced_column=f"{fieldname}id",
-                )
-
-                foreign_keys.append(fk)
-                continue  # Move to next column
-
-            # Pattern 2: *id (junction table columns and simple references)
-            # Example: accountid, vin_candidateid, vin_clinicaltrialid
-            if col_name.endswith("id"):
-                # Skip primary key
-                if primary_key and col.name == primary_key:
-                    continue
-
-                # Skip versionnumber
-                if col.name == "versionnumber":
-                    continue
-
-                # Strip 'id' suffix to get referenced table name
-                # accountid → account
-                # vin_candidateid → vin_candidate
-                referenced_table = col.name[:-2]  # Remove 'id'
-
-                fk = ForeignKeyMetadata(
-                    column=col.name,
-                    referenced_table=referenced_table,
-                    referenced_column=col.name,
-                )
-
+            # Try junction pattern (*id)
+            fk = self._detect_junction_table_fk(col, columns_with_fks, primary_key)
+            if fk:
                 foreign_keys.append(fk)
 
         return foreign_keys

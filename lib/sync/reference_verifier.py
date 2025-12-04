@@ -132,6 +132,7 @@ class ReferenceVerifier:
 
                 # Find dangling references using LEFT JOIN
                 # Query: Find records where FK is not null but referenced record doesn't exist
+                # S608: Table/column names are from EntityConfig and TableSchema, not user input
                 query = f"""
                     SELECT
                         t.{fk_column},
@@ -142,7 +143,7 @@ class ReferenceVerifier:
                     WHERE t.{fk_column} IS NOT NULL
                         AND r.{self._get_primary_key(db_manager, referenced_table)} IS NULL
                     GROUP BY t.{fk_column}
-                """
+                """  # noqa: S608, SQL safe - table/column names from EntityConfig/TableSchema (not user input), values parameterized
 
                 try:
                     cursor.execute(query)
@@ -154,8 +155,9 @@ class ReferenceVerifier:
                         sample_ids = [row[0] for row in dangling_refs[:10]]
 
                         # Count total references checked
+                        # S608: SQL safe - table/column names from EntityConfig/TableSchema (not user input), values parameterized
                         cursor.execute(
-                            f"SELECT COUNT(*) FROM {entity_api_name} WHERE {fk_column} IS NOT NULL",
+                            f"SELECT COUNT(*) FROM {entity_api_name} WHERE {fk_column} IS NOT NULL",  # noqa: S608
                         )
                         total_checked = cursor.fetchone()[0]
 

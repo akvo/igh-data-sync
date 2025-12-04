@@ -111,7 +111,7 @@ def load_entities(path: str = "entities_config.json") -> list[str]:
         msg = f"Entity configuration file not found: {path}"
         raise FileNotFoundError(msg)
 
-    with open(config_path) as f:
+    with open(config_path, encoding="utf-8") as f:
         config = json.load(f)
 
     if "entities" not in config:
@@ -156,7 +156,7 @@ def load_entity_configs(path: str = "entities_config.json") -> list[EntityConfig
         msg = f"Entity configuration file not found: {path}"
         raise FileNotFoundError(msg)
 
-    with open(config_path) as f:
+    with open(config_path, encoding="utf-8") as f:
         config = json.load(f)
 
     if "entities" not in config:

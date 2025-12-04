@@ -170,7 +170,7 @@ class DataverseClient:
                 "Accept": "application/json",
                 "OData-MaxVersion": "4.0",
                 "OData-Version": "4.0",
-                "Prefer": "odata.maxpagesize=5000",  # Enable pagination
+                "Prefer": "odata.maxpagesize=5000,odata.include-annotations=\"OData.Community.Display.V1.FormattedValue\"",
             }
 
             try:
@@ -178,7 +178,6 @@ class DataverseClient:
                     url,
                     headers=headers,
                     params=params,
-                    timeout=aiohttp.ClientTimeout(total=60),
                 ) as response:
                     # Handle 429 rate limiting
                     if response.status == HTTP_TOO_MANY_REQUESTS:

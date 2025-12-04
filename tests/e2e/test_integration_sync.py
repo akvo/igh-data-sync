@@ -39,19 +39,27 @@ class TestE2ESync:
             ),
         ]
 
-        # Create fake client with canned responses
+        # Create fake client with canned responses (including option sets)
         fake_client = FakeDataverseClient(test_config, "fake-token")
         fake_client.set_metadata_response(mock_metadata_xml)
         fake_client.set_entity_response("accounts", [
             {
                 "accountid": "00000000-0000-0000-0000-000000000001",
                 "name": "Acme Corporation",
+                "statuscode": 1,
+                "statuscode@OData.Community.Display.V1.FormattedValue": "Active",
+                "statecode": 0,
+                "statecode@OData.Community.Display.V1.FormattedValue": "Active",
                 "modifiedon": "2024-01-15T10:30:00Z",
                 "createdon": "2024-01-01T09:00:00Z",
             },
             {
                 "accountid": "00000000-0000-0000-0000-000000000002",
                 "name": "Global Industries",
+                "statuscode": 2,
+                "statuscode@OData.Community.Display.V1.FormattedValue": "Inactive",
+                "statecode": 1,
+                "statecode@OData.Community.Display.V1.FormattedValue": "Inactive",
                 "modifiedon": "2024-01-20T14:45:00Z",
                 "createdon": "2024-01-05T11:30:00Z",
             },
@@ -62,6 +70,8 @@ class TestE2ESync:
                 "fullname": "John Doe",
                 "emailaddress1": "john.doe@example.com",
                 "_parentcustomerid_value": "00000000-0000-0000-0000-000000000001",
+                "preferredcontactmethodcode": 1,
+                "preferredcontactmethodcode@OData.Community.Display.V1.FormattedValue": "Email",
                 "modifiedon": "2024-01-18T12:00:00Z",
                 "createdon": "2024-01-10T10:00:00Z",
             },
@@ -112,6 +122,37 @@ class TestE2ESync:
         assert states[0] == ("accounts", "completed")
         assert states[1] == ("contacts", "completed")
 
+        # NEW: Verify option set tables were created
+        cursor.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE '_optionset%' ORDER BY name"
+        )
+        optionset_tables = [row[0] for row in cursor.fetchall()]
+        assert "_optionset_statuscode" in optionset_tables
+        assert "_optionset_statecode" in optionset_tables
+        assert "_optionset_preferredcontactmethodcode" in optionset_tables
+
+        # NEW: Verify option set values were populated
+        cursor.execute("SELECT code, label FROM _optionset_statuscode ORDER BY code")
+        statuscode_values = cursor.fetchall()
+        assert (1, "Active") in statuscode_values
+        assert (2, "Inactive") in statuscode_values
+
+        cursor.execute("SELECT code, label FROM _optionset_statecode ORDER BY code")
+        statecode_values = cursor.fetchall()
+        assert (0, "Active") in statecode_values
+        assert (1, "Inactive") in statecode_values
+
+        # NEW: Verify JOINs work correctly
+        cursor.execute("""
+            SELECT a.name, a.statuscode, s.label
+            FROM accounts a
+            LEFT JOIN _optionset_statuscode s ON a.statuscode = s.code
+            ORDER BY a.name
+        """)
+        joined_data = cursor.fetchall()
+        assert joined_data[0] == ("Acme Corporation", 1, "Active")
+        assert joined_data[1] == ("Global Industries", 2, "Inactive")
+
         conn.close()
 
     @pytest.mark.asyncio
@@ -127,13 +168,15 @@ class TestE2ESync:
             EntityConfig(name="account", api_name="accounts", filtered=False, description=""),
         ]
 
-        # Initial sync
+        # Initial sync (with option sets)
         fake_client = FakeDataverseClient(test_config, "fake-token")
         fake_client.set_metadata_response(mock_metadata_xml)
         fake_client.set_entity_response("accounts", [
             {
                 "accountid": "00000000-0000-0000-0000-000000000001",
                 "name": "Acme Corp",
+                "statuscode": 1,
+                "statuscode@OData.Community.Display.V1.FormattedValue": "Active",
                 "modifiedon": "2024-01-01T10:00:00Z",
                 "createdon": "2024-01-01T09:00:00Z",
             },
@@ -150,13 +193,15 @@ class TestE2ESync:
         assert cursor.fetchone()[0] == "Acme Corp"
         conn.close()
 
-        # Incremental sync with updated record
+        # Incremental sync with updated record (including NEW option set value)
         fake_client2 = FakeDataverseClient(test_config, "fake-token")
         fake_client2.set_metadata_response(mock_metadata_xml)
         fake_client2.set_entity_response("accounts", [
             {
                 "accountid": "00000000-0000-0000-0000-000000000001",
                 "name": "Acme Corporation (Updated)",  # Changed!
+                "statuscode": 3,  # NEW option set value!
+                "statuscode@OData.Community.Display.V1.FormattedValue": "Pending",
                 "modifiedon": "2024-02-01T10:00:00Z",  # Newer timestamp
                 "createdon": "2024-01-01T09:00:00Z",
             },
@@ -173,6 +218,27 @@ class TestE2ESync:
         assert cursor.fetchone()[0] == "Acme Corporation (Updated)"
         cursor.execute("SELECT COUNT(*) FROM accounts")
         assert cursor.fetchone()[0] == 1  # Still 1 record (upserted)
+
+        # NEW: Verify option set table now has BOTH old and new values
+        cursor.execute("SELECT code, label FROM _optionset_statuscode ORDER BY code")
+        statuscode_values = cursor.fetchall()
+        assert len(statuscode_values) == 2  # Original "Active" + new "Pending"
+        assert (1, "Active") in statuscode_values  # From first sync
+        assert (3, "Pending") in statuscode_values  # From second sync
+
+        # NEW: Verify the account record has the new statuscode
+        cursor.execute("SELECT statuscode FROM accounts")
+        assert cursor.fetchone()[0] == 3
+
+        # NEW: Verify JOIN returns the new label
+        cursor.execute("""
+            SELECT a.name, s.label
+            FROM accounts a
+            LEFT JOIN _optionset_statuscode s ON a.statuscode = s.code
+        """)
+        result = cursor.fetchone()
+        assert result == ("Acme Corporation (Updated)", "Pending")
+
         conn.close()
 
     @pytest.mark.asyncio
@@ -299,4 +365,135 @@ class TestE2ESync:
         assert cursor.fetchone() is not None
         cursor.execute("SELECT COUNT(*) FROM accounts")
         assert cursor.fetchone()[0] == 0
+        conn.close()
+
+    @pytest.mark.asyncio
+    async def test_multiselect_option_sets(
+        self,
+        test_config,
+        temp_db,
+        mock_metadata_xml,
+    ):
+        """Test multi-select option sets create junction tables."""
+
+        test_entities = [
+            EntityConfig(name="account", api_name="accounts", filtered=False, description=""),
+        ]
+
+        # Setup with multi-select option set
+        fake_client = FakeDataverseClient(test_config, "fake-token")
+        fake_client.set_metadata_response(mock_metadata_xml)
+        fake_client.set_entity_response("accounts", [
+            {
+                "accountid": "00000000-0000-0000-0000-000000000001",
+                "name": "Acme Corp",
+                "categories": "1,2,3",  # Multi-select: comma-separated codes
+                "categories@OData.Community.Display.V1.FormattedValue": "Technology;Healthcare;Finance",  # Semicolon-separated labels
+                "modifiedon": "2024-01-01T10:00:00Z",
+                "createdon": "2024-01-01T09:00:00Z",
+            },
+            {
+                "accountid": "00000000-0000-0000-0000-000000000002",
+                "name": "Global Industries",
+                "categories": "2,4",  # Different categories
+                "categories@OData.Community.Display.V1.FormattedValue": "Healthcare;Manufacturing",
+                "modifiedon": "2024-01-01T10:00:00Z",
+                "createdon": "2024-01-01T09:00:00Z",
+            },
+        ])
+
+        with patch("builtins.print"):
+            db_manager = DatabaseManager(temp_db)
+            await run_sync_workflow(fake_client, test_config, test_entities, db_manager)
+
+        # Verify results
+        conn = sqlite3.connect(temp_db)
+        cursor = conn.cursor()
+
+        # Verify lookup table created with all unique values
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='_optionset_categories'")
+        assert cursor.fetchone() is not None
+
+        cursor.execute("SELECT code, label FROM _optionset_categories ORDER BY code")
+        categories = cursor.fetchall()
+        assert len(categories) == 4
+        assert (1, "Technology") in categories
+        assert (2, "Healthcare") in categories
+        assert (3, "Finance") in categories
+        assert (4, "Manufacturing") in categories
+
+        # Verify junction table created
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='_junction_accounts_categories'")
+        assert cursor.fetchone() is not None
+
+        # Verify junction records for first account
+        cursor.execute("""
+            SELECT option_code
+            FROM _junction_accounts_categories
+            WHERE entity_id = '00000000-0000-0000-0000-000000000001'
+            ORDER BY option_code
+        """)
+        acme_categories = [row[0] for row in cursor.fetchall()]
+        assert acme_categories == [1, 2, 3]
+
+        # Verify junction records for second account
+        cursor.execute("""
+            SELECT option_code
+            FROM _junction_accounts_categories
+            WHERE entity_id = '00000000-0000-0000-0000-000000000002'
+            ORDER BY option_code
+        """)
+        global_categories = [row[0] for row in cursor.fetchall()]
+        assert global_categories == [2, 4]
+
+        # Verify multi-select JOIN query works
+        cursor.execute("""
+            SELECT a.name, GROUP_CONCAT(c.label, ', ') as category_labels
+            FROM accounts a
+            LEFT JOIN _junction_accounts_categories j ON a.accountid = j.entity_id
+            LEFT JOIN _optionset_categories c ON j.option_code = c.code
+            GROUP BY a.accountid, a.name
+            ORDER BY a.name
+        """)
+        results = cursor.fetchall()
+        assert len(results) == 2
+        # Note: SQLite's GROUP_CONCAT might order differently, so we check membership
+        acme_result = [r for r in results if r[0] == "Acme Corp"][0]
+        assert "Technology" in acme_result[1]
+        assert "Healthcare" in acme_result[1]
+        assert "Finance" in acme_result[1]
+
+        conn.close()
+
+        # Test update: change categories for first account
+        fake_client2 = FakeDataverseClient(test_config, "fake-token")
+        fake_client2.set_metadata_response(mock_metadata_xml)
+        fake_client2.set_entity_response("accounts", [
+            {
+                "accountid": "00000000-0000-0000-0000-000000000001",
+                "name": "Acme Corp",
+                "categories": "3,4",  # Changed: removed 1,2 and added 4
+                "categories@OData.Community.Display.V1.FormattedValue": "Finance;Manufacturing",
+                "modifiedon": "2024-02-01T10:00:00Z",
+                "createdon": "2024-01-01T09:00:00Z",
+            },
+        ])
+
+        with patch("builtins.print"):
+            db_manager2 = DatabaseManager(temp_db)
+            await run_sync_workflow(fake_client2, test_config, test_entities, db_manager2)
+
+        # Verify junction records were updated correctly
+        conn = sqlite3.connect(temp_db)
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT option_code
+            FROM _junction_accounts_categories
+            WHERE entity_id = '00000000-0000-0000-0000-000000000001'
+            ORDER BY option_code
+        """)
+        updated_categories = [row[0] for row in cursor.fetchall()]
+        assert updated_categories == [3, 4]  # Old values removed, new values added
+
         conn.close()

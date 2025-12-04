@@ -15,6 +15,7 @@ A comprehensive toolkit for Microsoft Dataverse that validates schemas and syncs
 ### Sync Tool
 - ✅ Integrated schema validation before each sync
 - ✅ Authoritative schema from $metadata (not inferred)
+- ✅ Option set configuration for proper INTEGER columns
 - ✅ Auto-refresh authentication
 - ✅ Retry with exponential backoff
 - ✅ 429 rate limit handling
@@ -100,7 +101,10 @@ Given this configuration:
  igh-clean-sync/
 ├── validate_schema.py          # Schema validator entrypoint
 ├── sync_dataverse.py            # Sync tool entrypoint
+├── generate_optionset_config.py # Generate option set configuration
 ├── entities_config.json         # Entity configuration with filtered sync
+├── config/
+│   └── optionsets.json          # Option set field configuration
 ├── .env                         # Credentials (not committed)
 ├── .env.example                 # Template
 ├── requirements.txt             # Runtime dependencies
@@ -127,21 +131,26 @@ Given this configuration:
 │       ├── filtered_sync.py     # Filtered entity transitive closure (NEW)
 │       ├── reference_verifier.py # FK integrity verification (NEW)
 │       └── relationship_graph.py # FK relationship graph (NEW)
-└── tests/                       # Test suite (67 tests, 60.26% coverage)
+└── tests/                       # Test suite (97 tests, 63.13% coverage)
     ├── conftest.py              # Shared test fixtures
     ├── unit/                    # Unit tests (mirror lib/ structure)
     │   ├── test_auth.py         # OAuth authentication tests
     │   ├── test_config.py       # Configuration tests
     │   ├── test_dataverse_client.py # API client tests
     │   ├── test_type_mapping.py # Type mapping tests
+    │   ├── test_type_mapping_optionset.py # Option set type override tests
     │   ├── sync/
-    │   │   └── test_database.py # Database operations tests
+    │   │   ├── test_database.py # Database operations tests
+    │   │   ├── test_database_optionset_detection.py # Option set detection tests
+    │   │   └── test_optionset_detector.py # Option set detector tests
     │   └── validation/
     │       ├── test_metadata_parser.py # XML parsing tests
+    │       ├── test_metadata_parser_optionsets.py # Option set config tests
     │       ├── test_schema_comparer.py # Schema comparison tests
     │       └── test_validator.py # Pre-sync validation tests
     ├── e2e/                     # End-to-end integration tests
-    │   └── test_integration_sync.py # True E2E sync tests
+    │   ├── test_integration_sync.py # True E2E sync tests
+    │   └── test_optionset_config_workflow.py # Option set config workflow tests
     └── helpers/                 # Test utilities
         ├── __init__.py
         └── fake_dataverse_client.py # Mock API client for E2E tests
@@ -232,8 +241,8 @@ pytest -k "test_filtered_sync"
 ```
 
 **Test Statistics:**
-- 67 tests total
-- 60.26% code coverage
+- 97 tests total
+- 63.13% code coverage
 - All tests passing
 
 ### Linting and Formatting
@@ -302,6 +311,43 @@ Lists entities to sync/validate with singular/plural name mapping:
 - `api_name`: Plural name used for API endpoints and table names
 - `filtered`: If true, sync only records linked to already-synced entities
 - `description`: Human-readable description
+
+### config/optionsets.json
+
+Defines which fields are option sets (enums) for proper INTEGER column types:
+
+```json
+{
+  "vin_disease": [
+    "new_globalhealtharea",
+    "statuscode",
+    "statecode",
+    "vin_type"
+  ]
+}
+```
+
+**Why this matters:** Dataverse option sets (like `statuscode`) store integer codes but appear as text in metadata. This config ensures these fields are created as `INTEGER` columns instead of `TEXT`, enabling proper foreign key relationships to option set lookup tables (`_optionset_statuscode`, etc.).
+
+**Setup (one-time after first sync):**
+
+```bash
+# 1. Run initial sync (creates TEXT columns and detects option sets)
+python sync_dataverse.py
+
+# 2. Generate config from detected option sets
+mkdir -p config
+python generate_optionset_config.py > config/optionsets.json
+
+# 3. Review generated config
+cat config/optionsets.json
+
+# 4. Delete database and re-sync with INTEGER columns
+rm dataverse_complete.db
+python sync_dataverse.py
+```
+
+**After setup:** The config is loaded automatically on every sync. Regenerate when adding new entities or if Dataverse schema changes.
 
 ### Synced vs Excluded Entities
 
@@ -515,7 +561,7 @@ pytest --cov=lib --cov-report=term-missing tests/
 
 ### Test Coverage
 
-Current coverage: **60.26%** (67 tests passing)
+Current coverage: **63.13%** (97 tests passing)
 
 **Coverage by module:**
 - lib/auth.py: 96.77%
@@ -528,14 +574,17 @@ Current coverage: **60.26%** (67 tests passing)
 
 **Test types:**
 - **Unit tests** (tests/unit/): Individual component testing
-  - tests/unit/test_auth.py, test_config.py, test_dataverse_client.py, test_type_mapping.py
-  - tests/unit/sync/test_database.py
-  - tests/unit/validation/test_metadata_parser.py, test_schema_comparer.py, test_validator.py
+  - tests/unit/test_auth.py, test_config.py, test_dataverse_client.py
+  - tests/unit/test_type_mapping.py, test_type_mapping_optionset.py
+  - tests/unit/sync/test_database.py, test_database_optionset_detection.py, test_optionset_detector.py
+  - tests/unit/validation/test_metadata_parser.py, test_metadata_parser_optionsets.py, test_schema_comparer.py, test_validator.py
 - **E2E tests** (tests/e2e/): Full workflow testing with mocked APIs
   - Complete sync workflow
   - Incremental sync
   - Filtered sync with transitive closure
   - Empty entity handling
+  - Option set configuration workflow
+  - Multi-select option sets
 
 ### Run Specific Tests
 
@@ -638,7 +687,8 @@ Example CI workflow:
 - ✅ Full JSON storage for schema evolution
 - ✅ Sync state tracking (_sync_state, _sync_log)
 - ✅ UPSERT operations (INSERT OR REPLACE)
-- ✅ 67 tests (60.26% coverage), all passing
+- ✅ Option set configuration for INTEGER columns
+- ✅ 97 tests (63.13% coverage), all passing
 - ✅ Pre-commit hooks (ruff, pylint)
 - ✅ Type checking and linting
 

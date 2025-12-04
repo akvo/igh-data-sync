@@ -25,6 +25,10 @@ class ColumnMetadata:
             and self.max_length == other.max_length
         )
 
+    def __hash__(self):
+        """Hash columns using case-normalized values to match __eq__."""
+        return hash((self.name.lower(), self.db_type.upper(), self.nullable, self.max_length))
+
 
 @dataclass
 class ForeignKeyMetadata:
@@ -44,6 +48,10 @@ class ForeignKeyMetadata:
             and self.referenced_table.lower() == other.referenced_table.lower()
             and self.referenced_column.lower() == other.referenced_column.lower()
         )
+
+    def __hash__(self):
+        """Hash foreign keys using case-normalized values to match __eq__."""
+        return hash((self.column.lower(), self.referenced_table.lower(), self.referenced_column.lower()))
 
 
 @dataclass
@@ -112,7 +120,12 @@ EDM_TYPE_MAP_POSTGRESQL = {
 }
 
 
-def map_edm_to_db_type(edm_type: str, target_db: str, max_length: Optional[int] = None) -> str:
+def map_edm_to_db_type(
+    edm_type: str,
+    target_db: str,
+    max_length: Optional[int] = None,
+    is_option_set: bool = False,
+) -> str:
     """
     Map an Edm type to a database type.
 
@@ -120,10 +133,17 @@ def map_edm_to_db_type(edm_type: str, target_db: str, max_length: Optional[int] 
         edm_type: The OData Edm type (e.g., 'Edm.String')
         target_db: Target database type ('sqlite' or 'postgresql')
         max_length: Maximum length for string types
+        is_option_set: If True and edm_type is Edm.String, return INTEGER
+                       (option sets appear as Edm.String in metadata but store integer codes)
 
     Returns:
         The corresponding database type
     """
+    # CRITICAL: Override for option sets
+    # Option sets appear as Edm.String in metadata but store integer codes
+    if is_option_set and edm_type == "Edm.String":
+        return "INTEGER"
+
     if target_db.lower() == "sqlite":
         type_map = EDM_TYPE_MAP_SQLITE
     elif target_db.lower() in ("postgresql", "postgres"):
@@ -145,9 +165,35 @@ def map_edm_to_db_type(edm_type: str, target_db: str, max_length: Optional[int] 
     return base_type
 
 
+# Type alias mappings for database type normalization
+SQLITE_TYPE_ALIASES = {
+    "TEXT": {"VARCHAR", "CHAR", "NVARCHAR", "NCHAR", "CLOB"},
+    "INTEGER": {"INT", "TINYINT", "SMALLINT", "MEDIUMINT", "BIGINT"},
+    "REAL": {"DOUBLE", "FLOAT", "NUMERIC", "DECIMAL"},
+    "BLOB": {"BLOB", "BINARY", "VARBINARY"},
+}
+
+POSTGRESQL_TYPE_ALIASES = {
+    "TEXT": {"CHARACTER VARYING", "CHAR", "CHARACTER", "VARCHAR"},
+    "INTEGER": {"INT", "INT4"},
+    "SMALLINT": {"INT2"},
+    "BIGINT": {"INT8"},
+    "DOUBLE PRECISION": {"FLOAT8", "DOUBLE PRECISION"},
+    "REAL": {"FLOAT4"},
+    "BOOLEAN": {"BOOL"},
+    "TIMESTAMP WITH TIME ZONE": {"TIMESTAMPTZ"},
+}
+
+TYPE_ALIASES = {
+    "sqlite": SQLITE_TYPE_ALIASES,
+    "postgresql": POSTGRESQL_TYPE_ALIASES,
+    "postgres": POSTGRESQL_TYPE_ALIASES,
+}
+
+
 def normalize_db_type(db_type: str, target_db: str) -> str:
     """
-    Normalize database type for comparison.
+    Normalize database type for comparison using dictionary-driven lookup.
 
     Handles variations like:
     - VARCHAR vs TEXT
@@ -161,40 +207,23 @@ def normalize_db_type(db_type: str, target_db: str) -> str:
     Returns:
         Normalized type string for comparison
     """
-    db_type = db_type.upper().strip()
+    db_type_clean = db_type.upper().strip()
 
     # Remove length specifications for comparison
-    if "(" in db_type:
-        db_type = db_type.split("(")[0].strip()
+    if "(" in db_type_clean:
+        db_type_clean = db_type_clean.split("(")[0].strip()
 
-    if target_db.lower() == "sqlite":
-        # SQLite type affinity normalization
-        if db_type in ("VARCHAR", "CHAR", "NVARCHAR", "NCHAR", "CLOB"):
-            return "TEXT"
-        elif db_type in ("INT", "TINYINT", "SMALLINT", "MEDIUMINT", "BIGINT"):
-            return "INTEGER"
-        elif db_type in ("DOUBLE", "FLOAT", "NUMERIC", "DECIMAL"):
-            return "REAL"
-        elif db_type in ("BLOB", "BINARY", "VARBINARY"):
-            return "BLOB"
+    target_db_lower = target_db.lower()
+    if target_db_lower not in TYPE_ALIASES:
+        # Unknown database type - return as-is
+        return db_type_clean
 
-    elif target_db.lower() in ("postgresql", "postgres"):
-        # PostgreSQL type normalization
-        if db_type in ("CHARACTER VARYING", "CHAR", "CHARACTER", "VARCHAR"):
-            return "TEXT"  # Normalize to TEXT for comparison
-        elif db_type in ("INT", "INT4"):
-            return "INTEGER"
-        elif db_type in ("INT2",):
-            return "SMALLINT"
-        elif db_type in ("INT8",):
-            return "BIGINT"
-        elif db_type in ("FLOAT8", "DOUBLE PRECISION"):
-            return "DOUBLE PRECISION"
-        elif db_type in ("FLOAT4",):
-            return "REAL"
-        elif db_type in ("BOOL",):
-            return "BOOLEAN"
-        elif db_type in ("TIMESTAMPTZ",):
-            return "TIMESTAMP WITH TIME ZONE"
+    # Look up type in aliases dictionary
+    aliases = TYPE_ALIASES[target_db_lower]
 
-    return db_type
+    for canonical_type, variants in aliases.items():
+        if db_type_clean in variants:
+            return canonical_type
+
+    # No alias found - return cleaned type as-is
+    return db_type_clean

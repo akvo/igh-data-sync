@@ -1,5 +1,7 @@
 """Schema initialization using authoritative $metadata XML."""
 
+import json
+from pathlib import Path
 from typing import Optional
 
 from ..config import EntityConfig
@@ -69,14 +71,32 @@ async def initialize_tables(_config, entities: list[EntityConfig], client, db_ma
         RuntimeError: If schema fetch or table creation fails
     """
 
-    # Fetch schemas from $metadata
+    # STEP 1: Load option set config if exists
+    config_path = Path("config/optionsets.json")
+    option_set_fields_by_entity = {}
+
+    if config_path.exists():
+        print(f"Loading option set configuration from {config_path}...")
+        with open(config_path, encoding="utf-8") as f:
+            option_set_fields_by_entity = json.load(f)
+        total_fields = sum(len(fields) for fields in option_set_fields_by_entity.values())
+        num_entities = len(option_set_fields_by_entity)
+        print(f"  ✓ Loaded config for {num_entities} entities, {total_fields} option set fields")
+    else:
+        print("⚠️  No option set config found - tables will use TEXT for option sets")
+        print(f"   To fix: Run sync, then: python generate_optionset_config.py > {config_path}")
+
+    # STEP 2: Fetch schemas from $metadata
     fetcher = DataverseSchemaFetcher(client, target_db="sqlite")
 
     # Get singular names for $metadata lookup
     singular_names = [e.name for e in entities]
 
     print(f"Fetching schemas for {len(entities)} entities from $metadata...")
-    schemas = await fetcher.fetch_schemas_from_metadata(singular_names)
+    schemas = await fetcher.fetch_schemas_from_metadata(
+        singular_names,
+        option_set_fields_by_entity=option_set_fields_by_entity or None,
+    )
 
     # Create tables
     for entity in entities:
@@ -91,7 +111,7 @@ async def initialize_tables(_config, entities: list[EntityConfig], client, db_ma
 
         # Check if table exists
         if db_manager.table_exists(plural_name):
-            print(f"ℹ️  Table '{plural_name}' already exists, skipping")
+            print(f"  Table '{plural_name}' already exists, skipping")
             continue
 
         print(f"Creating table '{plural_name}' with {len(schema.columns)} columns...")

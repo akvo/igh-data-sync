@@ -1,5 +1,7 @@
 """Fetch and extract Dataverse entity schemas from $metadata."""
 
+from typing import Optional
+
 from ..dataverse_client import DataverseClient
 from ..type_mapping import TableSchema
 from .metadata_parser import MetadataParser
@@ -23,7 +25,11 @@ class DataverseSchemaFetcher:
         self.target_db = target_db
         self.parser = MetadataParser(target_db=target_db)
 
-    async def fetch_schemas_from_metadata(self, entity_names: list[str]) -> dict[str, TableSchema]:
+    async def fetch_schemas_from_metadata(
+        self,
+        entity_names: list[str],
+        option_set_fields_by_entity: Optional[dict[str, list[str]]] = None,
+    ) -> dict[str, TableSchema]:
         """
         Fetch schemas for specified entities from $metadata.
 
@@ -35,6 +41,8 @@ class DataverseSchemaFetcher:
 
         Args:
             entity_names: List of entity names to fetch (logical names, singular)
+            option_set_fields_by_entity: Optional dict mapping entity name to list of
+                                         option set field names (from config file)
 
         Returns:
             Dict mapping entity name to TableSchema
@@ -47,9 +55,12 @@ class DataverseSchemaFetcher:
         metadata_xml = await self.client.get_metadata()
         print(f"Fetched $metadata ({len(metadata_xml)} bytes)")
 
-        # Parse all schemas
+        # Parse all schemas with option set field info (from config)
         print("Parsing metadata XML...")
-        all_schemas = self.parser.parse_metadata_xml(metadata_xml)
+        all_schemas = self.parser.parse_metadata_xml(
+            metadata_xml,
+            option_set_fields_by_entity=option_set_fields_by_entity,
+        )
         print(f"Parsed {len(all_schemas)} entity schemas")
 
         # Filter to requested entities

@@ -52,6 +52,9 @@ def mock_metadata_xml():
         <Key><PropertyRef Name="accountid"/></Key>
         <Property Name="accountid" Type="Edm.Guid" Nullable="false"/>
         <Property Name="name" Type="Edm.String" MaxLength="160"/>
+        <Property Name="statuscode" Type="Edm.Int32"/>
+        <Property Name="statecode" Type="Edm.Int32"/>
+        <Property Name="categories" Type="Edm.String"/>
         <Property Name="modifiedon" Type="Edm.DateTimeOffset"/>
         <Property Name="createdon" Type="Edm.DateTimeOffset"/>
       </EntityType>
@@ -60,6 +63,7 @@ def mock_metadata_xml():
         <Property Name="contactid" Type="Edm.Guid" Nullable="false"/>
         <Property Name="firstname" Type="Edm.String" MaxLength="50"/>
         <Property Name="lastname" Type="Edm.String" MaxLength="50"/>
+        <Property Name="preferredcontactmethodcode" Type="Edm.Int32"/>
       </EntityType>
     </Schema>
   </edmx:DataServices>

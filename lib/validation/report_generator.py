@@ -62,7 +62,7 @@ class ReportGenerator:
             },
         }
 
-        with open(output_path, "w") as f:
+        with open(output_path, "w", encoding="utf-8") as f:
             json.dump(report, f, indent=2)
 
         print(f"JSON report saved to: {output_path}")
@@ -215,7 +215,7 @@ class ReportGenerator:
         lines.extend(self._build_detailed_issues(differences, by_entity))
 
         # Write report
-        with open(output_path, "w") as f:
+        with open(output_path, "w", encoding="utf-8") as f:
             f.write("\n".join(lines))
 
         print(f"Markdown report saved to: {output_path}")

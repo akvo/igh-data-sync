@@ -14,11 +14,13 @@ from ..validation.metadata_parser import MetadataParser
 class EntityRelationships:
     """Relationships for a single entity."""
 
-    # Entities this entity references (this_table.fk_column → other_table.pk)
-    references_to: list[tuple[str, str]] = field(default_factory=list)  # [(table, fk_column), ...]
+    # Entities this entity references: (table, fk_column, referenced_column)
+    # Example: [("vin_diseases", "_vin_disease_value", "vin_diseaseid"), ...]  # noqa: ERA001
+    references_to: list[tuple[str, str, str]] = field(default_factory=list)
 
-    # Entities that reference this entity (other_table.fk_column → this_table.pk)
-    referenced_by: list[tuple[str, str]] = field(default_factory=list)  # [(table, fk_column), ...]
+    # Entities that reference this entity: (table, fk_column, referenced_column)
+    # Example: [("vin_candidates", "_vin_disease_value", "vin_diseaseid"), ...]  # noqa: ERA001
+    referenced_by: list[tuple[str, str, str]] = field(default_factory=list)
 
 
 class RelationshipGraph:
@@ -93,14 +95,20 @@ class RelationshipGraph:
                     continue
 
                 # Record: this entity references the other entity
-                graph.relationships[api_name].references_to.append((referenced_api_name, fk.column))
+                # Include referenced_column for SCD2 (business key, not surrogate key)
+                graph.relationships[api_name].references_to.append(
+                    (referenced_api_name, fk.column, fk.referenced_column)
+                )
 
                 # Record: other entity is referenced by this entity
-                graph.relationships[referenced_api_name].referenced_by.append((api_name, fk.column))
+                # Include referenced_column for SCD2 (business key, not surrogate key)
+                graph.relationships[referenced_api_name].referenced_by.append(
+                    (api_name, fk.column, fk.referenced_column)
+                )
 
         return graph
 
-    def get_entities_that_reference(self, entity_api_name: str) -> list[tuple[str, str]]:
+    def get_entities_that_reference(self, entity_api_name: str) -> list[tuple[str, str, str]]:
         """
         Get all entities that reference the given entity.
 
@@ -108,14 +116,14 @@ class RelationshipGraph:
             entity_api_name: Entity API name (e.g., 'accounts')
 
         Returns:
-            List of (table_name, fk_column) tuples that reference this entity
-            e.g., [('vin_candidates', '_accountid_value'), ...]
+            List of (table_name, fk_column, referenced_column) tuples that reference this entity
+            e.g., [('vin_candidates', '_accountid_value', 'accountid'), ...]
         """
         if entity_api_name not in self.relationships:
             return []
         return self.relationships[entity_api_name].referenced_by
 
-    def get_entities_referenced_by(self, entity_api_name: str) -> list[tuple[str, str]]:
+    def get_entities_referenced_by(self, entity_api_name: str) -> list[tuple[str, str, str]]:
         """
         Get all entities that this entity references.
 
@@ -123,8 +131,8 @@ class RelationshipGraph:
             entity_api_name: Entity API name (e.g., 'accounts')
 
         Returns:
-            List of (table_name, fk_column) tuples this entity references
-            e.g., [('contacts', '_primarycontactid_value'), ...]
+            List of (table_name, fk_column, referenced_column) tuples this entity references
+            e.g., [('contacts', '_primarycontactid_value', 'contactid'), ...]
         """
         if entity_api_name not in self.relationships:
             return []

@@ -16,6 +16,11 @@ A comprehensive toolkit for Microsoft Dataverse that validates schemas and syncs
 - ✅ Integrated schema validation before each sync
 - ✅ Authoritative schema from $metadata (not inferred)
 - ✅ Option set configuration for proper INTEGER columns
+- ✅ **SCD2 (Slowly Changing Dimension Type 2)** for complete historical tracking
+  - Entity versioning with `valid_from`/`valid_to` temporal columns
+  - Junction table versioning with relationship snapshots
+  - Point-in-time queries and full audit trail
+  - Optimized indexes for efficient temporal queries
 - ✅ Auto-refresh authentication
 - ✅ Retry with exponential backoff
 - ✅ 429 rate limit handling
@@ -24,6 +29,54 @@ A comprehensive toolkit for Microsoft Dataverse that validates schemas and syncs
 - ✅ Incremental sync using modifiedon timestamps
 - ✅ Full JSON storage for schema evolution
 - ✅ Sync state tracking and resumability
+
+## SCD2 Historical Tracking
+
+The sync system implements **SCD2 (Slowly Changing Dimension Type 2)** to preserve complete history of all record changes. When a record is updated in Dataverse, a new version is created instead of overwriting the old one.
+
+### Key Features
+
+**Entity Versioning:**
+- Each record update creates a new row with updated data
+- Old versions are closed by setting `valid_to` timestamp
+- Current version has `valid_to = NULL`
+- Query active records: `WHERE valid_to IS NULL`
+- Query full history: `ORDER BY valid_from`
+- Point-in-time queries: `WHERE valid_from <= ? AND (valid_to IS NULL OR valid_to > ?)`
+
+**Junction Table Versioning:**
+- Multi-select option set relationships tracked over time
+- Full relationship snapshots tied to parent entity versions
+- Only snapshot when parent entity changes (storage optimization)
+- Query active relationships: `WHERE entity_id = ? AND valid_to IS NULL`
+- Query relationship history: join on `a.valid_from = j.valid_from`
+
+**Implementation Details:**
+- Surrogate primary keys (`row_id`, `junction_id`)
+- Three optimized indexes per table for efficient queries
+- Change detection via `json_response` comparison
+- sync_time fallback for entities without `modifiedon`
+- Option set lookup tables excluded (reference data only)
+
+**Example:**
+```sql
+-- Current version only
+SELECT * FROM accounts WHERE valid_to IS NULL;
+
+-- Full version history
+SELECT row_id, name, valid_from, valid_to
+FROM accounts
+WHERE accountid = '...'
+ORDER BY valid_from;
+
+-- As of specific date
+SELECT * FROM accounts
+WHERE accountid = '...'
+  AND valid_from <= '2024-06-01T00:00:00Z'
+  AND (valid_to IS NULL OR valid_to > '2024-06-01T00:00:00Z');
+```
+
+See [Implementation Summary](specs/scd2/IMPLEMENTATION_SUMMARY.md) for detailed technical documentation.
 
 ## Architecture
 
@@ -131,7 +184,7 @@ Given this configuration:
 │       ├── filtered_sync.py     # Filtered entity transitive closure (NEW)
 │       ├── reference_verifier.py # FK integrity verification (NEW)
 │       └── relationship_graph.py # FK relationship graph (NEW)
-└── tests/                       # Test suite (97 tests, 63.13% coverage)
+└── tests/                       # Test suite (107 tests, 65%+ coverage)
     ├── conftest.py              # Shared test fixtures
     ├── unit/                    # Unit tests (mirror lib/ structure)
     │   ├── test_auth.py         # OAuth authentication tests
@@ -241,8 +294,8 @@ pytest -k "test_filtered_sync"
 ```
 
 **Test Statistics:**
-- 97 tests total
-- 63.13% code coverage
+- 107 tests total (10 new SCD2 tests added)
+- Code coverage: 65%+
 - All tests passing
 
 ### Linting and Formatting
@@ -561,12 +614,12 @@ pytest --cov=lib --cov-report=term-missing tests/
 
 ### Test Coverage
 
-Current coverage: **63.13%** (97 tests passing)
+Current coverage: **65%+** (107 tests passing)
 
 **Coverage by module:**
 - lib/auth.py: 96.77%
 - lib/dataverse_client.py: 50.00%
-- lib/sync/database.py: 91.89%
+- lib/sync/database.py: 92%+ (includes SCD2 and junction table temporal tracking)
 - lib/sync/entity_sync.py: 57.50%
 - lib/sync/filtered_sync.py: 63.24%
 - lib/validation/validator.py: 84.51%
@@ -576,15 +629,16 @@ Current coverage: **63.13%** (97 tests passing)
 - **Unit tests** (tests/unit/): Individual component testing
   - tests/unit/test_auth.py, test_config.py, test_dataverse_client.py
   - tests/unit/test_type_mapping.py, test_type_mapping_optionset.py
-  - tests/unit/sync/test_database.py, test_database_optionset_detection.py, test_optionset_detector.py
+  - tests/unit/sync/test_database.py (includes SCD2 entity and junction table tests)
+  - tests/unit/sync/test_database_optionset_detection.py, test_optionset_detector.py
   - tests/unit/validation/test_metadata_parser.py, test_metadata_parser_optionsets.py, test_schema_comparer.py, test_validator.py
 - **E2E tests** (tests/e2e/): Full workflow testing with mocked APIs
-  - Complete sync workflow
-  - Incremental sync
+  - Complete sync workflow with SCD2 versioning
+  - Incremental sync with temporal tracking
   - Filtered sync with transitive closure
   - Empty entity handling
   - Option set configuration workflow
-  - Multi-select option sets
+  - Multi-select option sets with junction table versioning
 
 ### Run Specific Tests
 
@@ -677,6 +731,7 @@ Example CI workflow:
 - ✅ Integrated schema validation before each sync
 - ✅ Auto-creates tables from authoritative $metadata schemas
 - ✅ Exits on breaking schema changes (type/PK mismatches)
+- ✅ **SCD2 temporal tracking** with entity and junction table versioning
 - ✅ Incremental sync using modifiedon timestamps
 - ✅ Filtered entity sync with transitive closure
 - ✅ Reference verification (--verify flag)
@@ -686,9 +741,9 @@ Example CI workflow:
 - ✅ Concurrency control (50 parallel requests)
 - ✅ Full JSON storage for schema evolution
 - ✅ Sync state tracking (_sync_state, _sync_log)
-- ✅ UPSERT operations (INSERT OR REPLACE)
+- ✅ SCD2 UPSERT operations with change detection
 - ✅ Option set configuration for INTEGER columns
-- ✅ 97 tests (63.13% coverage), all passing
+- ✅ 107 tests (65%+ coverage), all passing
 - ✅ Pre-commit hooks (ruff, pylint)
 - ✅ Type checking and linting
 

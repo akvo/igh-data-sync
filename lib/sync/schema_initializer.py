@@ -29,6 +29,10 @@ def generate_create_table_sql(
 
     # Add columns from schema
     column_defs = []
+
+    # Add surrogate primary key as FIRST column (for SCD2)
+    column_defs.append("  row_id INTEGER PRIMARY KEY AUTOINCREMENT")
+
     for col in schema.columns:
         col_def = f"  {col.name} {col.db_type}"
 
@@ -36,9 +40,8 @@ def generate_create_table_sql(
         if not col.nullable:
             col_def += " NOT NULL"
 
-        # Mark primary key
-        if col.name.lower() == schema.primary_key.lower() if schema.primary_key else False:
-            col_def += " PRIMARY KEY"
+        # NOTE: Primary key constraint removed for SCD2
+        # Business key is now a regular indexed column
 
         column_defs.append(col_def)
 
@@ -50,6 +53,8 @@ def generate_create_table_sql(
             column_defs.append("  sync_time TEXT NOT NULL")
         if "valid_from" in special_columns:
             column_defs.append("  valid_from TEXT")
+        if "valid_to" in special_columns:
+            column_defs.append("  valid_to TEXT")
 
     lines.append(",\n".join(column_defs))
     lines.append(");")
@@ -120,7 +125,7 @@ async def initialize_tables(_config, entities: list[EntityConfig], client, db_ma
         create_sql = generate_create_table_sql(
             table_name=plural_name,
             schema=schema,
-            special_columns=["json_response", "sync_time", "valid_from"],
+            special_columns=["json_response", "sync_time", "valid_from", "valid_to"],
         )
 
         # Execute CREATE TABLE
@@ -132,6 +137,22 @@ async def initialize_tables(_config, entities: list[EntityConfig], client, db_ma
 
         if any(c.name == "createdon" for c in schema.columns):
             db_manager.create_index(plural_name, "createdon")
+
+        # Create SCD2 indexes
+        # Check if primary key actually exists in columns (some entities have mismatched pk names)
+        column_names = [c.name for c in schema.columns]
+        if schema.primary_key and schema.primary_key in column_names:
+            # Index on business key for lookups
+            db_manager.create_index(plural_name, schema.primary_key)
+
+            # Composite index (business_key, valid_to) for efficient active record queries
+            index_name = f"idx_{plural_name}_{schema.primary_key}_valid_to"
+            # S608: SQL safe - table/column names from schema (not user input)
+            sql = f"CREATE INDEX IF NOT EXISTS {index_name} ON {plural_name}({schema.primary_key}, valid_to)"
+            db_manager.execute(sql)
+
+        # Index on valid_to for time-travel queries
+        db_manager.create_index(plural_name, "valid_to")
 
         print(f"✓ Table '{plural_name}' created successfully")
 

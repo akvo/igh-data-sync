@@ -125,9 +125,10 @@ class TestDatabaseOptionSetDetection:
         assert rows[0][0] == 1
         assert rows[0][1] == "Category A"
 
-        # Check junction table populated
+        # Check junction table populated (active records only)
         cursor.execute(
-            "SELECT entity_id, option_code FROM _junction_accounts_categories ORDER BY option_code"
+            "SELECT entity_id, option_code FROM _junction_accounts_categories "
+            "WHERE valid_to IS NULL ORDER BY option_code"
         )
         junction_rows = cursor.fetchall()
 

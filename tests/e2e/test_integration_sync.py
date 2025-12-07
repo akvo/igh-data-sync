@@ -211,13 +211,21 @@ class TestE2ESync:
             db_manager2 = DatabaseManager(temp_db)
             await run_sync_workflow(fake_client2, test_config, test_entities, db_manager2)
 
-        # Verify update (proves upsert_batch() ran correctly)
+        # Verify update (proves upsert_batch() ran correctly with SCD2)
         conn = sqlite3.connect(temp_db)
         cursor = conn.cursor()
-        cursor.execute("SELECT name FROM accounts")
+
+        # SCD2: Query active records only (valid_to IS NULL)
+        cursor.execute("SELECT name FROM accounts WHERE valid_to IS NULL")
         assert cursor.fetchone()[0] == "Acme Corporation (Updated)"
+
+        # SCD2: Should have 2 records total (old version + new version)
         cursor.execute("SELECT COUNT(*) FROM accounts")
-        assert cursor.fetchone()[0] == 1  # Still 1 record (upserted)
+        assert cursor.fetchone()[0] == 2  # Historical + current
+
+        # SCD2: Should have 1 active record
+        cursor.execute("SELECT COUNT(*) FROM accounts WHERE valid_to IS NULL")
+        assert cursor.fetchone()[0] == 1  # Only current version is active
 
         # NEW: Verify option set table now has BOTH old and new values
         cursor.execute("SELECT code, label FROM _optionset_statuscode ORDER BY code")
@@ -226,15 +234,16 @@ class TestE2ESync:
         assert (1, "Active") in statuscode_values  # From first sync
         assert (3, "Pending") in statuscode_values  # From second sync
 
-        # NEW: Verify the account record has the new statuscode
-        cursor.execute("SELECT statuscode FROM accounts")
+        # NEW: Verify the account record has the new statuscode (query active record only)
+        cursor.execute("SELECT statuscode FROM accounts WHERE valid_to IS NULL")
         assert cursor.fetchone()[0] == 3
 
-        # NEW: Verify JOIN returns the new label
+        # NEW: Verify JOIN returns the new label (query active record only)
         cursor.execute("""
             SELECT a.name, s.label
             FROM accounts a
             LEFT JOIN _optionset_statuscode s ON a.statuscode = s.code
+            WHERE a.valid_to IS NULL
         """)
         result = cursor.fetchone()
         assert result == ("Acme Corporation (Updated)", "Pending")
@@ -426,32 +435,36 @@ class TestE2ESync:
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='_junction_accounts_categories'")
         assert cursor.fetchone() is not None
 
-        # Verify junction records for first account
+        # Verify junction records for first account (active records only)
         cursor.execute("""
             SELECT option_code
             FROM _junction_accounts_categories
             WHERE entity_id = '00000000-0000-0000-0000-000000000001'
+              AND valid_to IS NULL
             ORDER BY option_code
         """)
         acme_categories = [row[0] for row in cursor.fetchall()]
         assert acme_categories == [1, 2, 3]
 
-        # Verify junction records for second account
+        # Verify junction records for second account (active records only)
         cursor.execute("""
             SELECT option_code
             FROM _junction_accounts_categories
             WHERE entity_id = '00000000-0000-0000-0000-000000000002'
+              AND valid_to IS NULL
             ORDER BY option_code
         """)
         global_categories = [row[0] for row in cursor.fetchall()]
         assert global_categories == [2, 4]
 
-        # Verify multi-select JOIN query works
+        # Verify multi-select JOIN query works (active records only)
         cursor.execute("""
             SELECT a.name, GROUP_CONCAT(c.label, ', ') as category_labels
             FROM accounts a
-            LEFT JOIN _junction_accounts_categories j ON a.accountid = j.entity_id
+            LEFT JOIN _junction_accounts_categories j
+              ON a.accountid = j.entity_id AND j.valid_to IS NULL
             LEFT JOIN _optionset_categories c ON j.option_code = c.code
+            WHERE a.valid_to IS NULL
             GROUP BY a.accountid, a.name
             ORDER BY a.name
         """)
@@ -483,7 +496,7 @@ class TestE2ESync:
             db_manager2 = DatabaseManager(temp_db)
             await run_sync_workflow(fake_client2, test_config, test_entities, db_manager2)
 
-        # Verify junction records were updated correctly
+        # Verify junction records were updated correctly (active records only)
         conn = sqlite3.connect(temp_db)
         cursor = conn.cursor()
 
@@ -491,6 +504,7 @@ class TestE2ESync:
             SELECT option_code
             FROM _junction_accounts_categories
             WHERE entity_id = '00000000-0000-0000-0000-000000000001'
+              AND valid_to IS NULL
             ORDER BY option_code
         """)
         updated_categories = [row[0] for row in cursor.fetchall()]

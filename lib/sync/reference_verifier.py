@@ -118,7 +118,7 @@ class ReferenceVerifier:
                 continue
 
             # Check each foreign key
-            for referenced_table, fk_column in relationships.references_to:
+            for referenced_table, fk_column, referenced_column in relationships.references_to:
                 report.total_checks += 1
 
                 # Check if referenced table exists
@@ -133,15 +133,16 @@ class ReferenceVerifier:
                 # Find dangling references using LEFT JOIN
                 # Query: Find records where FK is not null but referenced record doesn't exist
                 # S608: Table/column names are from EntityConfig and TableSchema, not user input
+                # Use referenced_column from metadata (business key for SCD2, not surrogate key)
                 query = f"""
                     SELECT
                         t.{fk_column},
                         COUNT(*) as ref_count
                     FROM {entity_api_name} t
                     LEFT JOIN {referenced_table} r
-                        ON t.{fk_column} = r.{self._get_primary_key(db_manager, referenced_table)}
+                        ON t.{fk_column} = r.{referenced_column}
                     WHERE t.{fk_column} IS NOT NULL
-                        AND r.{self._get_primary_key(db_manager, referenced_table)} IS NULL
+                        AND r.{referenced_column} IS NULL
                     GROUP BY t.{fk_column}
                 """  # noqa: S608, SQL safe - table/column names from EntityConfig/TableSchema (not user input), values parameterized
 
@@ -155,7 +156,7 @@ class ReferenceVerifier:
                         sample_ids = [row[0] for row in dangling_refs[:10]]
 
                         # Count total references checked
-                        # S608: SQL safe - table/column names from EntityConfig/TableSchema (not user input), values parameterized
+                        # S608: table/column names from EntityConfig/TableSchema, not user input
                         cursor.execute(
                             f"SELECT COUNT(*) FROM {entity_api_name} WHERE {fk_column} IS NOT NULL",  # noqa: S608
                         )

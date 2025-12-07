@@ -70,7 +70,7 @@ class FilteredSyncManager:
                 # Get all tables/columns that reference this entity
                 references = relationship_graph.get_entities_that_reference(entity_api_name)
 
-                for table_name, fk_column in references:
+                for table_name, fk_column, _referenced_column in references:
                     # Query distinct FK values from this table
                     fk_values = db_manager.query_distinct_values(table_name, fk_column)
 
@@ -194,7 +194,7 @@ class FilteredSyncManager:
         existing_ids = set()
         cursor = self.db_manager.conn.cursor()
         for id_val in ids:
-            # S608: SQL safe - table/column names from EntityConfig/TableSchema (not user input), values parameterized
+            # S608: table/column names from EntityConfig/TableSchema, not user input
             cursor.execute(
                 f"SELECT 1 FROM {entity_api_name} WHERE {primary_key} = ? LIMIT 1",  # noqa: S608
                 (id_val,),

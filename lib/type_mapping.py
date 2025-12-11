@@ -51,7 +51,11 @@ class ForeignKeyMetadata:
 
     def __hash__(self):
         """Hash foreign keys using case-normalized values to match __eq__."""
-        return hash((self.column.lower(), self.referenced_table.lower(), self.referenced_column.lower()))
+        return hash((
+            self.column.lower(),
+            self.referenced_table.lower(),
+            self.referenced_column.lower(),
+        ))
 
 
 @dataclass
@@ -146,7 +150,7 @@ def map_edm_to_db_type(
 
     if target_db.lower() == "sqlite":
         type_map = EDM_TYPE_MAP_SQLITE
-    elif target_db.lower() in ("postgresql", "postgres"):
+    elif target_db.lower() in {"postgresql", "postgres"}:
         type_map = EDM_TYPE_MAP_POSTGRESQL
     else:
         msg = f"Unsupported database type: {target_db}"
@@ -155,7 +159,7 @@ def map_edm_to_db_type(
     base_type = type_map.get(edm_type, "TEXT")
 
     # For PostgreSQL VARCHAR, add length if specified
-    if target_db.lower() in ("postgresql", "postgres") and base_type == "VARCHAR":
+    if target_db.lower() in {"postgresql", "postgres"} and base_type == "VARCHAR":
         if max_length:
             return f"VARCHAR({max_length})"
         else:

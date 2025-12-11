@@ -36,7 +36,7 @@ class DatabaseSchemaQuery:
         """
         if self.db_type == "sqlite":
             return self._query_sqlite_schemas(entity_names)
-        elif self.db_type in ("postgresql", "postgres"):
+        elif self.db_type in {"postgresql", "postgres"}:
             return self._query_postgresql_schemas(entity_names)
         else:
             msg = f"Unsupported database type: {self.db_type}"
@@ -114,7 +114,7 @@ class DatabaseSchemaQuery:
                 schemas[entity_name] = schema
 
             conn.close()
-            return schemas
+            return schemas  # noqa: TRY300 - clear flow, no benefit from else block
 
         except sqlite3.Error as e:
             msg = f"SQLite query failed: {e}"
@@ -131,7 +131,7 @@ class DatabaseSchemaQuery:
             Dict mapping table name to TableSchema
         """
         try:
-            import psycopg2
+            import psycopg2  # noqa: PLC0415 - optional dependency, only imported when PostgreSQL used
         except ImportError:
             msg = "psycopg2 not installed. Install with: pip install psycopg2-binary"
             raise RuntimeError(
@@ -246,7 +246,7 @@ class DatabaseSchemaQuery:
                 schemas[entity_name] = schema
 
             conn.close()
-            return schemas
+            return schemas  # noqa: TRY300 - clear flow, no benefit from else block
 
         except Exception as e:
             msg = f"PostgreSQL query failed: {e}"

@@ -16,6 +16,7 @@ Exit codes:
 import argparse
 import asyncio
 import sys
+import traceback
 
 from lib.auth import DataverseAuth
 from lib.config import load_config, load_entities
@@ -121,8 +122,6 @@ async def main():
         sys.exit(1)
     except Exception as e:
         print(f"\n❌ ERROR: {e}", file=sys.stderr)
-        import traceback
-
         traceback.print_exc()
         sys.exit(1)
 

@@ -31,7 +31,7 @@ def extract_option_sets(db_path: str) -> dict[str, list[str]]:
         print("❌ entities_config.json not found", file=sys.stderr)
         sys.exit(1)
 
-    with open(config_path, encoding="utf-8") as f:
+    with Path(config_path).open(encoding="utf-8") as f:
         entities_config = json.load(f)
 
     # Build mapping: plural table name → singular entity name

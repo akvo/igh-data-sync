@@ -56,9 +56,7 @@ def test_parser_with_option_set_config():
 </edmx:Edmx>"""
 
     # Config specifies that statuscode and new_globalhealtharea are option sets
-    option_set_config = {
-        "vin_disease": ["statuscode", "new_globalhealtharea"]
-    }
+    option_set_config = {"vin_disease": ["statuscode", "new_globalhealtharea"]}
 
     parser = MetadataParser(target_db="sqlite")
     schemas = parser.parse_metadata_xml(xml, option_set_fields_by_entity=option_set_config)
@@ -106,19 +104,13 @@ def test_parser_with_partial_option_set_config():
 </edmx:Edmx>"""
 
     # Config only specifies option sets for vin_disease, not vin_product
-    option_set_config = {
-        "vin_disease": ["statuscode"]
-    }
+    option_set_config = {"vin_disease": ["statuscode"]}
 
     parser = MetadataParser(target_db="sqlite")
     schemas = parser.parse_metadata_xml(xml, option_set_fields_by_entity=option_set_config)
 
-    disease_statuscode = next(
-        (c for c in schemas["vin_disease"].columns if c.name == "statuscode"), None
-    )
-    product_statuscode = next(
-        (c for c in schemas["vin_product"].columns if c.name == "statuscode"), None
-    )
+    disease_statuscode = next((c for c in schemas["vin_disease"].columns if c.name == "statuscode"), None)
+    product_statuscode = next((c for c in schemas["vin_product"].columns if c.name == "statuscode"), None)
 
     # vin_disease.statuscode should be INTEGER (in config)
     assert disease_statuscode.db_type == "INTEGER"
@@ -146,9 +138,7 @@ def test_parser_option_sets_dont_affect_other_types():
 </edmx:Edmx>"""
 
     # Mistakenly include versionnumber in config (but it's Edm.Int64, not Edm.String)
-    option_set_config = {
-        "vin_disease": ["statuscode", "versionnumber"]
-    }
+    option_set_config = {"vin_disease": ["statuscode", "versionnumber"]}
 
     parser = MetadataParser(target_db="sqlite")
     schemas = parser.parse_metadata_xml(xml, option_set_fields_by_entity=option_set_config)
@@ -212,9 +202,7 @@ def test_parser_postgresql_with_option_sets():
   </edmx:DataServices>
 </edmx:Edmx>"""
 
-    option_set_config = {
-        "vin_disease": ["statuscode"]
-    }
+    option_set_config = {"vin_disease": ["statuscode"]}
 
     parser = MetadataParser(target_db="postgresql")
     schemas = parser.parse_metadata_xml(xml, option_set_fields_by_entity=option_set_config)

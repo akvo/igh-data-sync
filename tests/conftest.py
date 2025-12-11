@@ -28,7 +28,7 @@ def test_config(temp_db):
     return Config(
         api_url="https://test.crm.dynamics.com/api/data/v9.2",
         client_id="test-client-id",
-        client_secret="test-client-secret",
+        client_secret="test-client-secret",  # noqa: S106
         scope="https://test.crm.dynamics.com/.default",
         sqlite_db_path=temp_db,
         postgres_connection_string=None,

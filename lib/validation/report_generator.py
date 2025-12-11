@@ -1,6 +1,7 @@
 """Generate validation reports in JSON and Markdown formats."""
 
 import json
+import pathlib
 from datetime import datetime, timezone
 
 from ..type_mapping import SchemaDifference, TableSchema
@@ -12,8 +13,8 @@ MAX_ERRORS_DISPLAYED = 10
 class ReportGenerator:
     """Generates schema validation reports."""
 
+    @staticmethod
     def generate_json_report(
-        self,
         differences: list[SchemaDifference],
         dataverse_schemas: dict[str, TableSchema],
         database_schemas: dict[str, TableSchema],
@@ -62,12 +63,13 @@ class ReportGenerator:
             },
         }
 
-        with open(output_path, "w", encoding="utf-8") as f:
+        with pathlib.Path(output_path).open("w", encoding="utf-8") as f:
             json.dump(report, f, indent=2)
 
         print(f"JSON report saved to: {output_path}")
 
-    def _build_report_header(self) -> list[str]:
+    @staticmethod
+    def _build_report_header() -> list[str]:
         """Build report header section."""
         return [
             "# Schema Validation Report",
@@ -76,8 +78,8 @@ class ReportGenerator:
             "",
         ]
 
+    @staticmethod
     def _build_summary_section(
-        self,
         differences: list[SchemaDifference],
         dataverse_schemas: dict,
         errors,
@@ -96,8 +98,8 @@ class ReportGenerator:
             "",
         ]
 
+    @staticmethod
     def _build_statistics_section(
-        self,
         dataverse_schemas: dict,
         database_schemas: dict,
     ) -> list[str]:
@@ -116,7 +118,8 @@ class ReportGenerator:
             "",
         ]
 
-    def _build_validation_result(self, errors) -> list[str]:
+    @staticmethod
+    def _build_validation_result(errors) -> list[str]:
         """Build validation result section."""
         lines = ["## Validation Result", ""]
         if len(errors) == 0:
@@ -126,7 +129,8 @@ class ReportGenerator:
         lines.append("")
         return lines
 
-    def _format_diff_group(self, diffs, severity_emoji: str) -> list[str]:
+    @staticmethod
+    def _format_diff_group(diffs, severity_emoji: str) -> list[str]:
         """Format a group of diffs with given severity emoji."""
         lines = []
         for diff in diffs:
@@ -137,8 +141,8 @@ class ReportGenerator:
         lines.append("")
         return lines
 
+    @staticmethod
     def _build_detailed_issues(
-        self,
         differences: list[SchemaDifference],
         by_entity: dict,
     ) -> list[str]:
@@ -162,22 +166,22 @@ class ReportGenerator:
             if entity_errors:
                 lines.append("**Errors:**")
                 lines.append("")
-                lines.extend(self._format_diff_group(entity_errors, "❌"))
+                lines.extend(ReportGenerator._format_diff_group(entity_errors, "❌"))
 
             if entity_warnings:
                 lines.append("**Warnings:**")
                 lines.append("")
-                lines.extend(self._format_diff_group(entity_warnings, "⚠️"))
+                lines.extend(ReportGenerator._format_diff_group(entity_warnings, "⚠️"))
 
             if entity_info:
                 lines.append("**Info:**")
                 lines.append("")
-                lines.extend(self._format_diff_group(entity_info, "ℹ️"))
+                lines.extend(ReportGenerator._format_diff_group(entity_info, "ℹ️"))  # noqa: RUF001 - info emoji for user-facing output
 
         return lines
 
+    @staticmethod
     def generate_markdown_report(
-        self,
         differences: list[SchemaDifference],
         dataverse_schemas: dict[str, TableSchema],
         database_schemas: dict[str, TableSchema],
@@ -206,22 +210,22 @@ class ReportGenerator:
 
         # Build report sections
         lines = []
-        lines.extend(self._build_report_header())
+        lines.extend(ReportGenerator._build_report_header())
         lines.extend(
-            self._build_summary_section(differences, dataverse_schemas, errors, warnings, info),
+            ReportGenerator._build_summary_section(differences, dataverse_schemas, errors, warnings, info),
         )
-        lines.extend(self._build_statistics_section(dataverse_schemas, database_schemas))
-        lines.extend(self._build_validation_result(errors))
-        lines.extend(self._build_detailed_issues(differences, by_entity))
+        lines.extend(ReportGenerator._build_statistics_section(dataverse_schemas, database_schemas))
+        lines.extend(ReportGenerator._build_validation_result(errors))
+        lines.extend(ReportGenerator._build_detailed_issues(differences, by_entity))
 
         # Write report
-        with open(output_path, "w", encoding="utf-8") as f:
+        with pathlib.Path(output_path).open("w", encoding="utf-8") as f:
             f.write("\n".join(lines))
 
         print(f"Markdown report saved to: {output_path}")
 
+    @staticmethod
     def print_summary(
-        self,
         differences: list[SchemaDifference],
         dataverse_schemas: dict[str, TableSchema],
         _database_schemas: dict[str, TableSchema],

@@ -1,7 +1,7 @@
 """Tests for OAuth authentication with Microsoft Dataverse."""
 
 import time
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 import responses
@@ -120,8 +120,8 @@ class TestDataverseAuth:
         auth = DataverseAuth(test_config)
         access_token = auth.authenticate()
 
-        assert access_token == "test-access-token-12345"
-        assert auth.token == "test-access-token-12345"
+        assert access_token == "test-access-token-12345"  # noqa: S105
+        assert auth.token == "test-access-token-12345"  # noqa: S105
         assert auth.token_expiry > time.time()
 
     @responses.activate
@@ -186,18 +186,18 @@ class TestDataverseAuth:
         auth = DataverseAuth(test_config)
         token = auth.get_token()
 
-        assert token == "fresh-token-67890"
+        assert token == "fresh-token-67890"  # noqa: S105
 
     def test_get_token_uses_cached_token(self, auth_instance):
         """Test get_token() returns cached token when still valid."""
         # Set up a valid cached token
-        auth_instance.token = "cached-token-abc123"
+        auth_instance.token = "cached-token-abc123"  # noqa: S105
         auth_instance.token_expiry = time.time() + 4000  # Valid for another 4000 seconds
 
         # Should return cached token without making any requests
         token = auth_instance.get_token()
 
-        assert token == "cached-token-abc123"
+        assert token == "cached-token-abc123"  # noqa: S105
 
     @responses.activate
     def test_get_token_refreshes_expiring_token(self, test_config):
@@ -205,7 +205,7 @@ class TestDataverseAuth:
         auth = DataverseAuth(test_config)
 
         # Set up an expiring token (within refresh window)
-        auth.token = "expiring-token"
+        auth.token = "expiring-token"  # noqa: S105
         auth.tenant_id = "12345678-1234-1234-1234-123456789abc"
         auth.token_expiry = time.time() + 2000  # Expires in 2000s (< 3000s refresh window)
 
@@ -223,8 +223,8 @@ class TestDataverseAuth:
 
         token = auth.get_token()
 
-        assert token == "refreshed-token-xyz"
-        assert auth.token == "refreshed-token-xyz"
+        assert token == "refreshed-token-xyz"  # noqa: S105
+        assert auth.token == "refreshed-token-xyz"  # noqa: S105
 
     @responses.activate
     def test_authenticate_network_error(self, test_config):
@@ -256,12 +256,12 @@ class TestDataverseAuth:
     def test_token_expiry_calculation(self, auth_instance):
         """Test token expiry is calculated correctly."""
         auth_instance.tenant_id = "test-tenant"
-        auth_instance.token = "test-token"
+        auth_instance.token = "test-token"  # noqa: S105
 
         # Mock time before authentication
         mock_time_before = 1000000.0
 
-        with patch("time.time", return_value=mock_time_before):
+        with patch("time.time", return_value=mock_time_before):  # noqa: SIM117
             with patch.object(auth_instance, "authenticate") as mock_auth:
                 mock_auth.return_value = "test-token"
                 auth_instance.token_expiry = mock_time_before + 3599

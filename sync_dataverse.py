@@ -18,6 +18,7 @@ Exit codes:
 import argparse
 import asyncio
 import sys
+import traceback
 
 from lib.auth import DataverseAuth
 from lib.config import load_config, load_entity_configs
@@ -193,11 +194,7 @@ def _report_failures(failed_entities):
     if failed_entities:
         print(f"\n⚠️  {len(failed_entities)} entity/entities failed to sync:")
         for entity_name, error in failed_entities:
-            error_preview = (
-                error[:MAX_ERROR_MESSAGE_LENGTH] + "..."
-                if len(error) > MAX_ERROR_MESSAGE_LENGTH
-                else error
-            )
+            error_preview = error[:MAX_ERROR_MESSAGE_LENGTH] + "..." if len(error) > MAX_ERROR_MESSAGE_LENGTH else error
             print(f"  - {entity_name}: {error_preview}")
 
 
@@ -328,8 +325,6 @@ async def main(verify_references=False):
         sys.exit(1)
     except Exception as e:
         print(f"\n❌ SYNC FAILED: {e}")
-        import traceback
-
         traceback.print_exc()
         sys.exit(1)
 
@@ -339,9 +334,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--verify",
         action="store_true",
-        help=(
-            "Verify reference integrity after sync (exits with error if dangling references found)"
-        ),
+        help=("Verify reference integrity after sync (exits with error if dangling references found)"),
     )
     args = parser.parse_args()
 

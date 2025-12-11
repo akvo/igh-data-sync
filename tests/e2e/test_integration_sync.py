@@ -42,40 +42,46 @@ class TestE2ESync:
         # Create fake client with canned responses (including option sets)
         fake_client = FakeDataverseClient(test_config, "fake-token")
         fake_client.set_metadata_response(mock_metadata_xml)
-        fake_client.set_entity_response("accounts", [
-            {
-                "accountid": "00000000-0000-0000-0000-000000000001",
-                "name": "Acme Corporation",
-                "statuscode": 1,
-                "statuscode@OData.Community.Display.V1.FormattedValue": "Active",
-                "statecode": 0,
-                "statecode@OData.Community.Display.V1.FormattedValue": "Active",
-                "modifiedon": "2024-01-15T10:30:00Z",
-                "createdon": "2024-01-01T09:00:00Z",
-            },
-            {
-                "accountid": "00000000-0000-0000-0000-000000000002",
-                "name": "Global Industries",
-                "statuscode": 2,
-                "statuscode@OData.Community.Display.V1.FormattedValue": "Inactive",
-                "statecode": 1,
-                "statecode@OData.Community.Display.V1.FormattedValue": "Inactive",
-                "modifiedon": "2024-01-20T14:45:00Z",
-                "createdon": "2024-01-05T11:30:00Z",
-            },
-        ])
-        fake_client.set_entity_response("contacts", [
-            {
-                "contactid": "00000000-0000-0000-0000-000000000003",
-                "fullname": "John Doe",
-                "emailaddress1": "john.doe@example.com",
-                "_parentcustomerid_value": "00000000-0000-0000-0000-000000000001",
-                "preferredcontactmethodcode": 1,
-                "preferredcontactmethodcode@OData.Community.Display.V1.FormattedValue": "Email",
-                "modifiedon": "2024-01-18T12:00:00Z",
-                "createdon": "2024-01-10T10:00:00Z",
-            },
-        ])
+        fake_client.set_entity_response(
+            "accounts",
+            [
+                {
+                    "accountid": "00000000-0000-0000-0000-000000000001",
+                    "name": "Acme Corporation",
+                    "statuscode": 1,
+                    "statuscode@OData.Community.Display.V1.FormattedValue": "Active",
+                    "statecode": 0,
+                    "statecode@OData.Community.Display.V1.FormattedValue": "Active",
+                    "modifiedon": "2024-01-15T10:30:00Z",
+                    "createdon": "2024-01-01T09:00:00Z",
+                },
+                {
+                    "accountid": "00000000-0000-0000-0000-000000000002",
+                    "name": "Global Industries",
+                    "statuscode": 2,
+                    "statuscode@OData.Community.Display.V1.FormattedValue": "Inactive",
+                    "statecode": 1,
+                    "statecode@OData.Community.Display.V1.FormattedValue": "Inactive",
+                    "modifiedon": "2024-01-20T14:45:00Z",
+                    "createdon": "2024-01-05T11:30:00Z",
+                },
+            ],
+        )
+        fake_client.set_entity_response(
+            "contacts",
+            [
+                {
+                    "contactid": "00000000-0000-0000-0000-000000000003",
+                    "fullname": "John Doe",
+                    "emailaddress1": "john.doe@example.com",
+                    "_parentcustomerid_value": "00000000-0000-0000-0000-000000000001",
+                    "preferredcontactmethodcode": 1,
+                    "preferredcontactmethodcode@OData.Community.Display.V1.FormattedValue": "Email",
+                    "modifiedon": "2024-01-18T12:00:00Z",
+                    "createdon": "2024-01-10T10:00:00Z",
+                },
+            ],
+        )
 
         # Suppress print statements for cleaner test output
         with patch("builtins.print"):
@@ -123,9 +129,7 @@ class TestE2ESync:
         assert states[1] == ("contacts", "completed")
 
         # NEW: Verify option set tables were created
-        cursor.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE '_optionset%' ORDER BY name"
-        )
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE '_optionset%' ORDER BY name")
         optionset_tables = [row[0] for row in cursor.fetchall()]
         assert "_optionset_statuscode" in optionset_tables
         assert "_optionset_statecode" in optionset_tables
@@ -171,16 +175,19 @@ class TestE2ESync:
         # Initial sync (with option sets)
         fake_client = FakeDataverseClient(test_config, "fake-token")
         fake_client.set_metadata_response(mock_metadata_xml)
-        fake_client.set_entity_response("accounts", [
-            {
-                "accountid": "00000000-0000-0000-0000-000000000001",
-                "name": "Acme Corp",
-                "statuscode": 1,
-                "statuscode@OData.Community.Display.V1.FormattedValue": "Active",
-                "modifiedon": "2024-01-01T10:00:00Z",
-                "createdon": "2024-01-01T09:00:00Z",
-            },
-        ])
+        fake_client.set_entity_response(
+            "accounts",
+            [
+                {
+                    "accountid": "00000000-0000-0000-0000-000000000001",
+                    "name": "Acme Corp",
+                    "statuscode": 1,
+                    "statuscode@OData.Community.Display.V1.FormattedValue": "Active",
+                    "modifiedon": "2024-01-01T10:00:00Z",
+                    "createdon": "2024-01-01T09:00:00Z",
+                },
+            ],
+        )
 
         with patch("builtins.print"):
             db_manager = DatabaseManager(temp_db)
@@ -196,16 +203,19 @@ class TestE2ESync:
         # Incremental sync with updated record (including NEW option set value)
         fake_client2 = FakeDataverseClient(test_config, "fake-token")
         fake_client2.set_metadata_response(mock_metadata_xml)
-        fake_client2.set_entity_response("accounts", [
-            {
-                "accountid": "00000000-0000-0000-0000-000000000001",
-                "name": "Acme Corporation (Updated)",  # Changed!
-                "statuscode": 3,  # NEW option set value!
-                "statuscode@OData.Community.Display.V1.FormattedValue": "Pending",
-                "modifiedon": "2024-02-01T10:00:00Z",  # Newer timestamp
-                "createdon": "2024-01-01T09:00:00Z",
-            },
-        ])
+        fake_client2.set_entity_response(
+            "accounts",
+            [
+                {
+                    "accountid": "00000000-0000-0000-0000-000000000001",
+                    "name": "Acme Corporation (Updated)",  # Changed!
+                    "statuscode": 3,  # NEW option set value!
+                    "statuscode@OData.Community.Display.V1.FormattedValue": "Pending",
+                    "modifiedon": "2024-02-01T10:00:00Z",  # Newer timestamp
+                    "createdon": "2024-01-01T09:00:00Z",
+                },
+            ],
+        )
 
         with patch("builtins.print"):
             db_manager2 = DatabaseManager(temp_db)
@@ -300,24 +310,33 @@ class TestE2ESync:
         fake_client.set_metadata_response(metadata_with_fks)
 
         # Candidates reference specific accounts and users
-        fake_client.set_entity_response("vin_candidates", [
-            {"vin_candidateid": "c1", "_parentaccountid_value": "a1", "_createdby_value": "u1"},
-            {"vin_candidateid": "c2", "_parentaccountid_value": "a1", "_createdby_value": "u2"},
-        ])
+        fake_client.set_entity_response(
+            "vin_candidates",
+            [
+                {"vin_candidateid": "c1", "_parentaccountid_value": "a1", "_createdby_value": "u1"},
+                {"vin_candidateid": "c2", "_parentaccountid_value": "a1", "_createdby_value": "u2"},
+            ],
+        )
 
         # Many accounts, but only a1 is referenced
-        fake_client.set_entity_response("accounts", [
-            {"accountid": "a1", "name": "Referenced Account"},
-            {"accountid": "a2", "name": "Unreferenced Account"},  # Should NOT sync
-            {"accountid": "a3", "name": "Another Unreferenced"},  # Should NOT sync
-        ])
+        fake_client.set_entity_response(
+            "accounts",
+            [
+                {"accountid": "a1", "name": "Referenced Account"},
+                {"accountid": "a2", "name": "Unreferenced Account"},  # Should NOT sync
+                {"accountid": "a3", "name": "Another Unreferenced"},  # Should NOT sync
+            ],
+        )
 
         # Many users, but only u1 and u2 are referenced
-        fake_client.set_entity_response("systemusers", [
-            {"systemuserid": "u1", "fullname": "User One"},
-            {"systemuserid": "u2", "fullname": "User Two"},
-            {"systemuserid": "u3", "fullname": "User Three"},  # Should NOT sync
-        ])
+        fake_client.set_entity_response(
+            "systemusers",
+            [
+                {"systemuserid": "u1", "fullname": "User One"},
+                {"systemuserid": "u2", "fullname": "User Two"},
+                {"systemuserid": "u3", "fullname": "User Three"},  # Should NOT sync
+            ],
+        )
 
         with patch("builtins.print"):
             db_manager = DatabaseManager(temp_db)
@@ -392,24 +411,27 @@ class TestE2ESync:
         # Setup with multi-select option set
         fake_client = FakeDataverseClient(test_config, "fake-token")
         fake_client.set_metadata_response(mock_metadata_xml)
-        fake_client.set_entity_response("accounts", [
-            {
-                "accountid": "00000000-0000-0000-0000-000000000001",
-                "name": "Acme Corp",
-                "categories": "1,2,3",  # Multi-select: comma-separated codes
-                "categories@OData.Community.Display.V1.FormattedValue": "Technology;Healthcare;Finance",  # Semicolon-separated labels
-                "modifiedon": "2024-01-01T10:00:00Z",
-                "createdon": "2024-01-01T09:00:00Z",
-            },
-            {
-                "accountid": "00000000-0000-0000-0000-000000000002",
-                "name": "Global Industries",
-                "categories": "2,4",  # Different categories
-                "categories@OData.Community.Display.V1.FormattedValue": "Healthcare;Manufacturing",
-                "modifiedon": "2024-01-01T10:00:00Z",
-                "createdon": "2024-01-01T09:00:00Z",
-            },
-        ])
+        fake_client.set_entity_response(
+            "accounts",
+            [
+                {
+                    "accountid": "00000000-0000-0000-0000-000000000001",
+                    "name": "Acme Corp",
+                    "categories": "1,2,3",  # Multi-select: comma-separated codes
+                    "categories@OData.Community.Display.V1.FormattedValue": "Technology;Healthcare;Finance",  # Semicolon-separated labels
+                    "modifiedon": "2024-01-01T10:00:00Z",
+                    "createdon": "2024-01-01T09:00:00Z",
+                },
+                {
+                    "accountid": "00000000-0000-0000-0000-000000000002",
+                    "name": "Global Industries",
+                    "categories": "2,4",  # Different categories
+                    "categories@OData.Community.Display.V1.FormattedValue": "Healthcare;Manufacturing",
+                    "modifiedon": "2024-01-01T10:00:00Z",
+                    "createdon": "2024-01-01T09:00:00Z",
+                },
+            ],
+        )
 
         with patch("builtins.print"):
             db_manager = DatabaseManager(temp_db)
@@ -471,7 +493,7 @@ class TestE2ESync:
         results = cursor.fetchall()
         assert len(results) == 2
         # Note: SQLite's GROUP_CONCAT might order differently, so we check membership
-        acme_result = [r for r in results if r[0] == "Acme Corp"][0]
+        acme_result = next(r for r in results if r[0] == "Acme Corp")
         assert "Technology" in acme_result[1]
         assert "Healthcare" in acme_result[1]
         assert "Finance" in acme_result[1]
@@ -481,16 +503,19 @@ class TestE2ESync:
         # Test update: change categories for first account
         fake_client2 = FakeDataverseClient(test_config, "fake-token")
         fake_client2.set_metadata_response(mock_metadata_xml)
-        fake_client2.set_entity_response("accounts", [
-            {
-                "accountid": "00000000-0000-0000-0000-000000000001",
-                "name": "Acme Corp",
-                "categories": "3,4",  # Changed: removed 1,2 and added 4
-                "categories@OData.Community.Display.V1.FormattedValue": "Finance;Manufacturing",
-                "modifiedon": "2024-02-01T10:00:00Z",
-                "createdon": "2024-01-01T09:00:00Z",
-            },
-        ])
+        fake_client2.set_entity_response(
+            "accounts",
+            [
+                {
+                    "accountid": "00000000-0000-0000-0000-000000000001",
+                    "name": "Acme Corp",
+                    "categories": "3,4",  # Changed: removed 1,2 and added 4
+                    "categories@OData.Community.Display.V1.FormattedValue": "Finance;Manufacturing",
+                    "modifiedon": "2024-02-01T10:00:00Z",
+                    "createdon": "2024-01-01T09:00:00Z",
+                },
+            ],
+        )
 
         with patch("builtins.print"):
             db_manager2 = DatabaseManager(temp_db)

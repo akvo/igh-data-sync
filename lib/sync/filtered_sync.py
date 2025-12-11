@@ -82,8 +82,7 @@ class FilteredSyncManager:
                     if new_count > old_count:
                         added = new_count - old_count
                         print(
-                            f"      {entity_api_name}: +{added} from {table_name}.{fk_column} "
-                            f"(total: {new_count})",
+                            f"      {entity_api_name}: +{added} from {table_name}.{fk_column} (total: {new_count})",
                         )
                         changed = True
 
@@ -114,7 +113,8 @@ class FilteredSyncManager:
         self.db_manager = db_manager
         self.state_manager = state_manager
 
-    def _resolve_primary_key(self, schema: TableSchema, entity: EntityConfig) -> str:
+    @staticmethod
+    def _resolve_primary_key(schema: TableSchema, entity: EntityConfig) -> str:
         """
         Resolve primary key column name with fallback logic.
 
@@ -148,21 +148,15 @@ class FilteredSyncManager:
         fallback_pk = f"{entity.name}id"
         if fallback_pk in column_names:
             print(
-                f"    ⚠️  Primary key '{primary_key}' not in columns, "
-                f"using '{fallback_pk}' instead",
+                f"    ⚠️  Primary key '{primary_key}' not in columns, using '{fallback_pk}' instead",
             )
             return fallback_pk
 
         # Fallback 2: Any column ending with 'id' that's not a FK
-        id_cols = [
-            name
-            for name in column_names
-            if name.endswith("id") and not name.startswith("_")
-        ]
+        id_cols = [name for name in column_names if name.endswith("id") and not name.startswith("_")]
         if id_cols:
             print(
-                f"    ⚠️  Primary key '{primary_key}' not in columns, "
-                f"using '{id_cols[0]}' instead",
+                f"    ⚠️  Primary key '{primary_key}' not in columns, using '{id_cols[0]}' instead",
             )
             return id_cols[0]
 
@@ -194,9 +188,8 @@ class FilteredSyncManager:
         existing_ids = set()
         cursor = self.db_manager.conn.cursor()
         for id_val in ids:
-            # S608: table/column names from EntityConfig/TableSchema, not user input
             cursor.execute(
-                f"SELECT 1 FROM {entity_api_name} WHERE {primary_key} = ? LIMIT 1",  # noqa: S608
+                f"SELECT 1 FROM {entity_api_name} WHERE {primary_key} = ? LIMIT 1",  # noqa: S608 - table/column names from schema, values parameterized
                 (id_val,),
             )
             if cursor.fetchone():
@@ -297,7 +290,7 @@ class FilteredSyncManager:
 
         try:
             # Resolve primary key with fallback logic
-            primary_key = self._resolve_primary_key(schema, entity)
+            primary_key = FilteredSyncManager._resolve_primary_key(schema, entity)
 
             # Get last timestamp for incremental sync
             last_timestamp = self.db_manager.get_last_sync_timestamp(entity.api_name)
@@ -320,9 +313,7 @@ class FilteredSyncManager:
                 timestamp_filter = f"modifiedon gt {last_timestamp}"
                 for i in range(0, len(existing_ids), self.BATCH_SIZE):
                     batch = list(existing_ids)[i : i + self.BATCH_SIZE]
-                    records = await self._fetch_id_batch(
-                        batch, primary_key, entity.api_name, timestamp_filter
-                    )
+                    records = await self._fetch_id_batch(batch, primary_key, entity.api_name, timestamp_filter)
                     all_records.extend(records)
 
             # UPSERT all records
@@ -334,7 +325,7 @@ class FilteredSyncManager:
                 self._update_sync_timestamp_from_records(entity.api_name, all_records)
 
             self.state_manager.complete_sync(log_id, entity.api_name, total_added, total_updated)
-            return total_added, total_updated
+            return total_added, total_updated  # noqa: TRY300 - clear flow, no benefit from else block
 
         except Exception as e:
             self.state_manager.fail_sync(log_id, entity.api_name, str(e))

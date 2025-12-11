@@ -108,9 +108,7 @@ class TestSCD2Operations:
 
         # Verify record inserted with valid_to = NULL
         cursor = self.db.conn.cursor()
-        cursor.execute(
-            "SELECT accountid, name, valid_from, valid_to FROM accounts WHERE accountid = 'a1'"
-        )
+        cursor.execute("SELECT accountid, name, valid_from, valid_to FROM accounts WHERE accountid = 'a1'")
         row = cursor.fetchone()
         assert row[0] == "a1"
         assert row[1] == "Acme Corp"
@@ -147,19 +145,13 @@ class TestSCD2Operations:
         assert cursor.fetchone()[0] == 2
 
         # Verify old record is closed
-        cursor.execute(
-            "SELECT name, valid_to FROM accounts WHERE accountid = 'a1' "
-            "ORDER BY row_id LIMIT 1"
-        )
+        cursor.execute("SELECT name, valid_to FROM accounts WHERE accountid = 'a1' ORDER BY row_id LIMIT 1")
         row = cursor.fetchone()
         assert row[0] == "Acme Corp"
         assert row[1] == "2024-02-01T09:00:00Z"  # Closed with new valid_from
 
         # Verify new record is active
-        cursor.execute(
-            "SELECT name, valid_from, valid_to FROM accounts WHERE accountid = 'a1' "
-            "AND valid_to IS NULL"
-        )
+        cursor.execute("SELECT name, valid_from, valid_to FROM accounts WHERE accountid = 'a1' AND valid_to IS NULL")
         row = cursor.fetchone()
         assert row[0] == "Acme Corporation"
         assert row[1] == "2024-02-01T09:00:00Z"
@@ -255,9 +247,7 @@ class TestSCD2Operations:
         assert cursor.fetchone()[0] == 2
 
         # Verify a2 is still "Beta Inc"
-        cursor.execute(
-            "SELECT name FROM accounts WHERE accountid = 'a2' AND valid_to IS NULL"
-        )
+        cursor.execute("SELECT name FROM accounts WHERE accountid = 'a2' AND valid_to IS NULL")
         assert cursor.fetchone()[0] == "Beta Inc"
 
 
@@ -291,7 +281,7 @@ class TestJunctionTableSCD2:
 
     def test_junction_snapshot_on_new_entity(self):
         """Test junction records created with valid_to = NULL for new entity."""
-        from lib.sync.database import SCD2Result
+        from lib.sync.database import SCD2Result  # noqa: PLC0415
 
         # Snapshot for new entity
         scd2_result = SCD2Result(
@@ -310,28 +300,19 @@ class TestJunctionTableSCD2:
 
         # Verify 3 junction records created
         cursor = self.db.conn.cursor()
-        cursor.execute(
-            "SELECT COUNT(*) FROM _junction_accounts_categories WHERE entity_id = 'a1'"
-        )
+        cursor.execute("SELECT COUNT(*) FROM _junction_accounts_categories WHERE entity_id = 'a1'")
         assert cursor.fetchone()[0] == 3
 
         # Verify all have valid_to = NULL (active)
-        cursor.execute(
-            "SELECT COUNT(*) FROM _junction_accounts_categories "
-            "WHERE entity_id = 'a1' AND valid_to IS NULL"
-        )
+        cursor.execute("SELECT COUNT(*) FROM _junction_accounts_categories WHERE entity_id = 'a1' AND valid_to IS NULL")
         assert cursor.fetchone()[0] == 3
 
         # Verify valid_from matches parent
-        cursor.execute(
-            "SELECT DISTINCT valid_from FROM _junction_accounts_categories "
-            "WHERE entity_id = 'a1'"
-        )
+        cursor.execute("SELECT DISTINCT valid_from FROM _junction_accounts_categories WHERE entity_id = 'a1'")
         assert cursor.fetchone()[0] == "2024-01-01T09:00:00Z"
 
     def test_junction_snapshot_on_entity_update(self):
         """Test junction snapshot closes old records and creates new ones."""
-        from lib.sync.database import SCD2Result
 
         # Initial snapshot
         self.db.snapshot_junction_relationships(
@@ -352,16 +333,11 @@ class TestJunctionTableSCD2:
         cursor = self.db.conn.cursor()
 
         # Verify total records: 2 old + 3 new = 5
-        cursor.execute(
-            "SELECT COUNT(*) FROM _junction_accounts_categories WHERE entity_id = 'a1'"
-        )
+        cursor.execute("SELECT COUNT(*) FROM _junction_accounts_categories WHERE entity_id = 'a1'")
         assert cursor.fetchone()[0] == 5
 
         # Verify only 3 active records (new snapshot)
-        cursor.execute(
-            "SELECT COUNT(*) FROM _junction_accounts_categories "
-            "WHERE entity_id = 'a1' AND valid_to IS NULL"
-        )
+        cursor.execute("SELECT COUNT(*) FROM _junction_accounts_categories WHERE entity_id = 'a1' AND valid_to IS NULL")
         assert cursor.fetchone()[0] == 3
 
         # Verify old records closed with correct valid_to
@@ -381,7 +357,7 @@ class TestJunctionTableSCD2:
 
     def test_junction_no_snapshot_when_entity_unchanged(self):
         """Test no junction snapshot when parent entity version_created = False."""
-        from lib.sync.database import SCD2Result
+        from lib.sync.database import SCD2Result  # noqa: PLC0415
 
         # Initial snapshot
         scd2_result1 = SCD2Result(
@@ -392,7 +368,7 @@ class TestJunctionTableSCD2:
         )
 
         # Simulate populate_detected_option_sets with version_created=True
-        from lib.sync.optionset_detector import DetectedOptionSet
+        from lib.sync.optionset_detector import DetectedOptionSet  # noqa: PLC0415
 
         detected = {
             "categories": DetectedOptionSet(
@@ -412,9 +388,7 @@ class TestJunctionTableSCD2:
 
         # Verify 2 junction records created
         cursor = self.db.conn.cursor()
-        cursor.execute(
-            "SELECT COUNT(*) FROM _junction_accounts_categories WHERE entity_id = 'a1'"
-        )
+        cursor.execute("SELECT COUNT(*) FROM _junction_accounts_categories WHERE entity_id = 'a1'")
         assert cursor.fetchone()[0] == 2
 
         # Second sync: no change in entity (version_created=False)
@@ -434,9 +408,7 @@ class TestJunctionTableSCD2:
         )
 
         # Verify still only 2 junction records (no new snapshot)
-        cursor.execute(
-            "SELECT COUNT(*) FROM _junction_accounts_categories WHERE entity_id = 'a1'"
-        )
+        cursor.execute("SELECT COUNT(*) FROM _junction_accounts_categories WHERE entity_id = 'a1'")
         assert cursor.fetchone()[0] == 2
 
     def test_junction_query_active_relationships(self):
@@ -466,9 +438,7 @@ class TestJunctionTableSCD2:
         cursor = self.db.conn.cursor()
 
         # Verify total records: 2 + 2 + 3 = 7
-        cursor.execute(
-            "SELECT COUNT(*) FROM _junction_accounts_categories WHERE entity_id = 'a1'"
-        )
+        cursor.execute("SELECT COUNT(*) FROM _junction_accounts_categories WHERE entity_id = 'a1'")
         assert cursor.fetchone()[0] == 7
 
         # Query active relationships

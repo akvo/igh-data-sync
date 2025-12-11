@@ -104,7 +104,7 @@ class TestDataverseClient:
 
             async with DataverseClient(test_config, test_token) as client:
                 # The error happens when trying to parse text/plain as JSON
-                with pytest.raises(RuntimeError, match="HTTP request failed.*text/plain"):
+                with pytest.raises(RuntimeError, match=r"HTTP request failed.*text/plain"):
                     await client.get_entity_count("accounts")
 
     @pytest.mark.asyncio

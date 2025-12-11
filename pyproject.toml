@@ -5,7 +5,7 @@ description = "Microsoft Dataverse integration toolkit with schema validation an
 requires-python = ">=3.9"
 
 [tool.ruff]
-line-length = 100
+line-length = 120
 target-version = "py39"
 preview = true  # Enable preview rules for PLR0904 (too-many-public-methods)
 
@@ -54,13 +54,11 @@ select = [
     "TRY",    # tryceratops (exception handling best practices)
 ]
 
-# Ignore specific rules that may be too strict initially
+# Only truly universal ignores (case-by-case reviewed, all others use inline # noqa or fixed)
 ignore = [
-    "T20",     # Allow print statements (useful for CLI tools)
-    "S101",    # Allow assert statements (needed for tests)
-    "PTH123",  # Allow open() instead of Path.open() (more readable)
-    "TRY003",  # Allow long exception messages (can be addressed later)
-    "COM812",  # Trailing comma (conflicts with formatter)
+    "E501",    # Line length 120 chars - unavoidable for SQL strings, OData headers, error messages; formatter handles normal code
+    "T20",     # Print statements - CLI tool needs progress feedback (145+ print statements across sync/validate/generate scripts)
+    "COM812",  # Trailing comma - technical conflict with ruff-format, not a code quality issue
 ]
 
 # Allow auto-fixing for most rules
@@ -90,6 +88,7 @@ max-public-methods = 20     # Max public methods per class (preview rule PLR0904
     "PLR2004",   # Allow magic values in tests
     "ARG001",    # Allow unused function arguments (fixtures)
     "PLR0913",   # Allow many arguments in test functions
+    "PLR6301",   # Allow instance methods (needed for fixtures)
 ]
 
 # Main scripts can print to stdout

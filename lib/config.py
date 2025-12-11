@@ -111,7 +111,7 @@ def load_entities(path: str = "entities_config.json") -> list[str]:
         msg = f"Entity configuration file not found: {path}"
         raise FileNotFoundError(msg)
 
-    with open(config_path, encoding="utf-8") as f:
+    with Path(config_path).open(encoding="utf-8") as f:
         config = json.load(f)
 
     if "entities" not in config:
@@ -121,7 +121,7 @@ def load_entities(path: str = "entities_config.json") -> list[str]:
     entities = config["entities"]
     if not isinstance(entities, list):
         msg = "Invalid entities_config.json: 'entities' must be a list"
-        raise ValueError(msg)
+        raise TypeError(msg)
 
     entity_names = []
     for entity in entities:
@@ -156,7 +156,7 @@ def load_entity_configs(path: str = "entities_config.json") -> list[EntityConfig
         msg = f"Entity configuration file not found: {path}"
         raise FileNotFoundError(msg)
 
-    with open(config_path, encoding="utf-8") as f:
+    with Path(config_path).open(encoding="utf-8") as f:
         config = json.load(f)
 
     if "entities" not in config:
@@ -166,13 +166,13 @@ def load_entity_configs(path: str = "entities_config.json") -> list[EntityConfig
     entities = config["entities"]
     if not isinstance(entities, list):
         msg = "Invalid entities_config.json: 'entities' must be a list"
-        raise ValueError(msg)
+        raise TypeError(msg)
 
     entity_configs = []
     for entity in entities:
         if not isinstance(entity, dict):
             msg = f"Invalid entity entry: {entity}"
-            raise ValueError(msg)
+            raise TypeError(msg)
 
         name = entity.get("name", "")
 

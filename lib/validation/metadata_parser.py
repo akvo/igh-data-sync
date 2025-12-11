@@ -1,7 +1,6 @@
 """Parser for OData $metadata XML to extract entity schemas."""
 
-# S405: xml.etree is safe here - parsing trusted metadata from Microsoft Dataverse API, not user input
-import xml.etree.ElementTree as ET  # noqa: S405
+import xml.etree.ElementTree as ET  # noqa: S405 - parsing trusted metadata from Dataverse API, not user input
 from typing import Optional
 
 from ..type_mapping import ColumnMetadata, ForeignKeyMetadata, TableSchema, map_edm_to_db_type
@@ -42,8 +41,7 @@ class MetadataParser:
             ValueError: If XML is invalid or cannot be parsed
         """
         try:
-            # S314: xml_content is from trusted Microsoft Dataverse API, not user input
-            root = ET.fromstring(xml_content)  # noqa: S314
+            root = ET.fromstring(xml_content)  # noqa: S314 - parsing trusted XML from Dataverse API, not user input
         except ET.ParseError as e:
             msg = f"Failed to parse XML: {e}"
             raise ValueError(msg) from e
@@ -68,9 +66,7 @@ class MetadataParser:
 
                 # Get option set fields for this entity (convert list to set)
                 option_set_fields = (
-                    set(option_set_fields_by_entity.get(entity_name, []))
-                    if option_set_fields_by_entity
-                    else set()
+                    set(option_set_fields_by_entity.get(entity_name, [])) if option_set_fields_by_entity else set()
                 )
 
                 # Parse this entity with option set field info
@@ -99,14 +95,14 @@ class MetadataParser:
         entity_name = entity_elem.get("Name")
 
         # Parse primary key
-        primary_key = self._parse_primary_key(entity_elem, ns)
+        primary_key = MetadataParser._parse_primary_key(entity_elem, ns)
 
         # Parse columns (properties) with option set field info
         columns = self._parse_properties(entity_elem, ns, option_set_fields)
 
         # Parse foreign keys using unified detection
         # (NavigationProperty + pattern matching for _*_value and *id columns)
-        foreign_keys = self._parse_all_foreign_keys(entity_elem, ns, columns, primary_key)
+        foreign_keys = MetadataParser._parse_all_foreign_keys(entity_elem, ns, columns, primary_key)
 
         return TableSchema(
             entity_name=entity_name,
@@ -115,7 +111,8 @@ class MetadataParser:
             foreign_keys=foreign_keys,
         )
 
-    def _parse_primary_key(self, entity_elem: ET.Element, ns: dict[str, str]) -> Optional[str]:
+    @staticmethod
+    def _parse_primary_key(entity_elem: ET.Element, ns: dict[str, str]) -> Optional[str]:
         """
         Parse primary key from Key/PropertyRef element.
 
@@ -198,7 +195,8 @@ class MetadataParser:
 
         return columns
 
-    def _extract_referenced_table_from_type(self, type_attr: str) -> str:
+    @staticmethod
+    def _extract_referenced_table_from_type(type_attr: str) -> str:
         """Extract entity name from Type attribute (removes Collection wrapper)."""
         # Remove "Collection(" wrapper if present
         if type_attr.startswith("Collection("):
@@ -206,9 +204,8 @@ class MetadataParser:
         # Extract entity name (after namespace prefix)
         return type_attr.split(".")[-1] if "." in type_attr else type_attr
 
-    def _detect_dataverse_lookup_fk(
-        self, col: ColumnMetadata, columns_with_fks: set
-    ) -> Optional[ForeignKeyMetadata]:
+    @staticmethod
+    def _detect_dataverse_lookup_fk(col: ColumnMetadata, columns_with_fks: set) -> Optional[ForeignKeyMetadata]:
         """Detect _fieldname_value pattern (Dataverse lookup fields)."""
         if col.name in columns_with_fks:
             return None
@@ -222,8 +219,9 @@ class MetadataParser:
             )
         return None
 
+    @staticmethod
     def _detect_junction_table_fk(
-        self, col: ColumnMetadata, columns_with_fks: set, primary_key: Optional[str]
+        col: ColumnMetadata, columns_with_fks: set, primary_key: Optional[str]
     ) -> Optional[ForeignKeyMetadata]:
         """Detect *id pattern (junction tables and simple references)."""
         if col.name in columns_with_fks:
@@ -243,8 +241,8 @@ class MetadataParser:
             referenced_column=col.name,
         )
 
+    @staticmethod
     def _parse_all_foreign_keys(
-        self,
         entity_elem: ET.Element,
         ns: dict[str, str],
         columns: list[ColumnMetadata],
@@ -292,7 +290,7 @@ class MetadataParser:
                 continue
 
             type_attr = nav_prop.get("Type", "")
-            referenced_table = self._extract_referenced_table_from_type(type_attr)
+            referenced_table = MetadataParser._extract_referenced_table_from_type(type_attr)
             if not referenced_table:
                 continue
 
@@ -309,13 +307,13 @@ class MetadataParser:
 
         for col in columns:
             # Try Dataverse pattern (_fieldname_value)
-            fk = self._detect_dataverse_lookup_fk(col, columns_with_fks)
+            fk = MetadataParser._detect_dataverse_lookup_fk(col, columns_with_fks)
             if fk:
                 foreign_keys.append(fk)
                 continue
 
             # Try junction pattern (*id)
-            fk = self._detect_junction_table_fk(col, columns_with_fks, primary_key)
+            fk = MetadataParser._detect_junction_table_fk(col, columns_with_fks, primary_key)
             if fk:
                 foreign_keys.append(fk)
 

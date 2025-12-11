@@ -3,7 +3,6 @@
 import pytest
 
 from lib.sync.database import DatabaseManager
-from lib.type_mapping import TableSchema
 
 
 class TestDatabaseOptionSetDetection:
@@ -57,12 +56,10 @@ class TestDatabaseOptionSetDetection:
 
     def test_populate_detected_option_sets_single_select(self):
         """Test populating single-select option set."""
-        from lib.sync.optionset_detector import DetectedOptionSet
+        from lib.sync.optionset_detector import DetectedOptionSet  # noqa: PLC0415
 
         # Create entity table
-        self.db.execute(
-            "CREATE TABLE accounts (accountid TEXT PRIMARY KEY, statuscode INTEGER)"
-        )
+        self.db.execute("CREATE TABLE accounts (accountid TEXT PRIMARY KEY, statuscode INTEGER)")
 
         detected = {
             "statuscode": DetectedOptionSet(
@@ -72,14 +69,7 @@ class TestDatabaseOptionSetDetection:
             )
         }
 
-        api_record = {
-            "accountid": "acc123",
-            "statuscode": 1,
-        }
-
-        self.db.populate_detected_option_sets(
-            detected, "accounts", "acc123", "accountid"
-        )
+        self.db.populate_detected_option_sets(detected, "accounts", "acc123", "accountid")
 
         # Check lookup table populated
         cursor = self.db.conn.cursor()
@@ -94,7 +84,7 @@ class TestDatabaseOptionSetDetection:
 
     def test_populate_detected_option_sets_multi_select(self):
         """Test populating multi-select option set."""
-        from lib.sync.optionset_detector import DetectedOptionSet
+        from lib.sync.optionset_detector import DetectedOptionSet  # noqa: PLC0415
 
         # Create entity table
         self.db.execute("CREATE TABLE accounts (accountid TEXT PRIMARY KEY)")
@@ -107,14 +97,7 @@ class TestDatabaseOptionSetDetection:
             )
         }
 
-        api_record = {
-            "accountid": "acc123",
-            "categories": "1,2",
-        }
-
-        self.db.populate_detected_option_sets(
-            detected, "accounts", "acc123", "accountid"
-        )
+        self.db.populate_detected_option_sets(detected, "accounts", "acc123", "accountid")
 
         # Check lookup table populated
         cursor = self.db.conn.cursor()

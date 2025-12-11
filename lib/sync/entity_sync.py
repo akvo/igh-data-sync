@@ -54,7 +54,7 @@ async def sync_entity(entity, client, db_manager, state_manager, dv_schemas):
         state_manager.complete_sync(log_id, entity.api_name, added, updated)
         print(f"  ✓ {entity.api_name}: {added} added, {updated} updated")
 
-        return added, updated
+        return added, updated  # noqa: TRY300 - clear flow, no benefit from else block
 
     except Exception as e:
         state_manager.fail_sync(log_id, entity.api_name, str(e))
@@ -77,26 +77,21 @@ def _determine_actual_primary_key(schema, entity, records, column_names):
         if fallback_pk in column_names:
             actual_pk = fallback_pk
             print(
-                f"    ⚠️  Primary key '{schema.primary_key}' not in columns, "
-                f"using '{actual_pk}' instead",
+                f"    ⚠️  Primary key '{schema.primary_key}' not in columns, using '{actual_pk}' instead",
             )
         elif fallback_pk in records[0]:
             # It's in the API response but not in schema columns - add it
             actual_pk = fallback_pk
             print(
-                f"    ⚠️  Primary key '{schema.primary_key}' not in columns, "
-                f"using '{actual_pk}' from API response",
+                f"    ⚠️  Primary key '{schema.primary_key}' not in columns, using '{actual_pk}' from API response",
             )
         else:
             # Last resort: find any column ending with 'id' that exists in both schema and data
-            id_cols = [
-                name for name in column_names if name.endswith("id") and not name.startswith("_")
-            ]
+            id_cols = [name for name in column_names if name.endswith("id") and not name.startswith("_")]
             if id_cols:
                 actual_pk = id_cols[0]
                 print(
-                    f"    ⚠️  Primary key '{schema.primary_key}' not in columns, "
-                    f"using '{actual_pk}' instead",
+                    f"    ⚠️  Primary key '{schema.primary_key}' not in columns, using '{actual_pk}' instead",
                 )
             else:
                 msg = f"Cannot find valid primary key for {entity.api_name}"
@@ -111,8 +106,7 @@ def _update_sync_timestamp(db_manager, entity_api_name, records):
         # Get all non-null modifiedon values
         timestamps = [r["modifiedon"] for r in records if r.get("modifiedon")]
         print(
-            f"    DEBUG: Found {len(timestamps)} records with modifiedon "
-            f"out of {len(records)} total",
+            f"    DEBUG: Found {len(timestamps)} records with modifiedon out of {len(records)} total",
         )
         if timestamps:
             max_timestamp = max(timestamps)

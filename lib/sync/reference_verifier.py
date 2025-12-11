@@ -53,17 +53,14 @@ class VerificationReport:
                     f"{issue.dangling_count} dangling ({issue.total_checked} checked)",
                 )
                 if issue.sample_ids:
-                    sample = ", ".join(
-                        f"'{record_id}'" for record_id in issue.sample_ids[:MAX_SAMPLE_DISPLAY]
-                    )
+                    sample = ", ".join(f"'{record_id}'" for record_id in issue.sample_ids[:MAX_SAMPLE_DISPLAY])
                     if len(issue.sample_ids) > MAX_SAMPLE_DISPLAY:
                         sample += f", ... ({len(issue.sample_ids) - MAX_SAMPLE_DISPLAY} more)"
                     lines.append(f"  Missing IDs: [{sample}]")
 
             lines.append("")
             lines.append(
-                f"Summary: {len(self.issues)} table(s) with issues, "
-                f"{self.total_issues} dangling references total",
+                f"Summary: {len(self.issues)} table(s) with issues, {self.total_issues} dangling references total",
             )
 
         lines.append("=" * 60)
@@ -77,8 +74,8 @@ class ReferenceVerifier:
     Uses LEFT JOIN queries to detect dangling foreign key references.
     """
 
+    @staticmethod
     def verify_references(
-        self,
         db_manager: DatabaseManager,
         relationship_graph: RelationshipGraph,
     ) -> VerificationReport:
@@ -144,7 +141,7 @@ class ReferenceVerifier:
                     WHERE t.{fk_column} IS NOT NULL
                         AND r.{referenced_column} IS NULL
                     GROUP BY t.{fk_column}
-                """  # noqa: S608, SQL safe - table/column names from EntityConfig/TableSchema (not user input), values parameterized
+                """  # , SQL safe - table/column names from EntityConfig/TableSchema (not user input), values parameterized  # noqa: S608
 
                 try:
                     cursor.execute(query)
@@ -156,9 +153,8 @@ class ReferenceVerifier:
                         sample_ids = [row[0] for row in dangling_refs[:10]]
 
                         # Count total references checked
-                        # S608: table/column names from EntityConfig/TableSchema, not user input
                         cursor.execute(
-                            f"SELECT COUNT(*) FROM {entity_api_name} WHERE {fk_column} IS NOT NULL",  # noqa: S608
+                            f"SELECT COUNT(*) FROM {entity_api_name} WHERE {fk_column} IS NOT NULL",  # noqa: S608 - table/column names from schema, not user input
                         )
                         total_checked = cursor.fetchone()[0]
 
@@ -180,7 +176,8 @@ class ReferenceVerifier:
 
         return report
 
-    def _get_primary_key(self, db_manager: DatabaseManager, table_name: str) -> str:
+    @staticmethod
+    def _get_primary_key(db_manager: DatabaseManager, table_name: str) -> str:
         """
         Get primary key column name for a table.
 

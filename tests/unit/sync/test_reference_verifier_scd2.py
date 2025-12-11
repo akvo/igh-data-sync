@@ -1,6 +1,5 @@
 """Tests for reference verifier with SCD2 temporal tables."""
 
-
 import pytest
 
 from lib.sync.database import DatabaseManager
@@ -73,13 +72,11 @@ class TestReferenceVerifierSCD2:
         """Test valid FK references to business key (not surrogate key)."""
         # Insert disease with 2 versions (same business key, different row_ids)
         db_manager.execute(
-            "INSERT INTO vin_diseases (vin_diseaseid, vin_name, valid_from, valid_to) "
-            "VALUES (?, ?, ?, ?)",
+            "INSERT INTO vin_diseases (vin_diseaseid, vin_name, valid_from, valid_to) VALUES (?, ?, ?, ?)",
             ("guid-hiv-123", "HIV/AIDS", "2020-01-01", "2021-01-01"),
         )
         db_manager.execute(
-            "INSERT INTO vin_diseases (vin_diseaseid, vin_name, valid_from, valid_to) "
-            "VALUES (?, ?, ?, ?)",
+            "INSERT INTO vin_diseases (vin_diseaseid, vin_name, valid_from, valid_to) VALUES (?, ?, ?, ?)",
             ("guid-hiv-123", "HIV/AIDS v2", "2021-01-01", None),
         )
 
@@ -104,13 +101,13 @@ class TestReferenceVerifierSCD2:
         """Test that dangling FK is detected when business key doesn't exist."""
         # Insert disease
         db_manager.execute(
-            "INSERT INTO vin_diseases (vin_diseaseid, vin_name, valid_from, valid_to) VALUES (?, ?, ?, ?)",  # noqa: E501
+            "INSERT INTO vin_diseases (vin_diseaseid, vin_name, valid_from, valid_to) VALUES (?, ?, ?, ?)",
             ("guid-hiv-123", "HIV/AIDS", "2020-01-01", None),
         )
 
         # Insert candidate with non-existent disease reference
         db_manager.execute(
-            "INSERT INTO vin_candidates (vin_candidateid, vin_name, _vin_disease_value, valid_from, valid_to) "  # noqa: E501
+            "INSERT INTO vin_candidates (vin_candidateid, vin_name, _vin_disease_value, valid_from, valid_to) "
             "VALUES (?, ?, ?, ?, ?)",
             ("guid-candidate-1", "Candidate 1", "guid-malaria-999", "2021-06-01", None),
         )
@@ -133,26 +130,26 @@ class TestReferenceVerifierSCD2:
         """Test that FK verification works correctly with multiple versions of referenced entity."""
         # Insert disease with 3 versions (same business key)
         db_manager.execute(
-            "INSERT INTO vin_diseases (vin_diseaseid, vin_name, valid_from, valid_to) VALUES (?, ?, ?, ?)",  # noqa: E501
+            "INSERT INTO vin_diseases (vin_diseaseid, vin_name, valid_from, valid_to) VALUES (?, ?, ?, ?)",
             ("guid-hiv-123", "HIV", "2020-01-01", "2021-01-01"),
         )
         db_manager.execute(
-            "INSERT INTO vin_diseases (vin_diseaseid, vin_name, valid_from, valid_to) VALUES (?, ?, ?, ?)",  # noqa: E501
+            "INSERT INTO vin_diseases (vin_diseaseid, vin_name, valid_from, valid_to) VALUES (?, ?, ?, ?)",
             ("guid-hiv-123", "HIV/AIDS", "2021-01-01", "2022-01-01"),
         )
         db_manager.execute(
-            "INSERT INTO vin_diseases (vin_diseaseid, vin_name, valid_from, valid_to) VALUES (?, ?, ?, ?)",  # noqa: E501
+            "INSERT INTO vin_diseases (vin_diseaseid, vin_name, valid_from, valid_to) VALUES (?, ?, ?, ?)",
             ("guid-hiv-123", "HIV/AIDS v3", "2022-01-01", None),
         )
 
         # Insert multiple candidates referencing the same disease
         db_manager.execute(
-            "INSERT INTO vin_candidates (vin_candidateid, vin_name, _vin_disease_value, valid_from, valid_to) "  # noqa: E501
+            "INSERT INTO vin_candidates (vin_candidateid, vin_name, _vin_disease_value, valid_from, valid_to) "
             "VALUES (?, ?, ?, ?, ?)",
             ("guid-candidate-1", "Candidate 1", "guid-hiv-123", "2021-06-01", None),
         )
         db_manager.execute(
-            "INSERT INTO vin_candidates (vin_candidateid, vin_name, _vin_disease_value, valid_from, valid_to) "  # noqa: E501
+            "INSERT INTO vin_candidates (vin_candidateid, vin_name, _vin_disease_value, valid_from, valid_to) "
             "VALUES (?, ?, ?, ?, ?)",
             ("guid-candidate-2", "Candidate 2", "guid-hiv-123", "2021-07-01", None),
         )
@@ -170,27 +167,27 @@ class TestReferenceVerifierSCD2:
         """Test verification with mix of valid and invalid FK references."""
         # Insert 2 diseases
         db_manager.execute(
-            "INSERT INTO vin_diseases (vin_diseaseid, vin_name, valid_from, valid_to) VALUES (?, ?, ?, ?)",  # noqa: E501
+            "INSERT INTO vin_diseases (vin_diseaseid, vin_name, valid_from, valid_to) VALUES (?, ?, ?, ?)",
             ("guid-hiv-123", "HIV/AIDS", "2020-01-01", None),
         )
         db_manager.execute(
-            "INSERT INTO vin_diseases (vin_diseaseid, vin_name, valid_from, valid_to) VALUES (?, ?, ?, ?)",  # noqa: E501
+            "INSERT INTO vin_diseases (vin_diseaseid, vin_name, valid_from, valid_to) VALUES (?, ?, ?, ?)",
             ("guid-tb-456", "Tuberculosis", "2020-01-01", None),
         )
 
         # Insert candidates: 2 valid, 1 invalid
         db_manager.execute(
-            "INSERT INTO vin_candidates (vin_candidateid, vin_name, _vin_disease_value, valid_from, valid_to) "  # noqa: E501
+            "INSERT INTO vin_candidates (vin_candidateid, vin_name, _vin_disease_value, valid_from, valid_to) "
             "VALUES (?, ?, ?, ?, ?)",
             ("guid-candidate-1", "Candidate 1", "guid-hiv-123", "2021-06-01", None),
         )
         db_manager.execute(
-            "INSERT INTO vin_candidates (vin_candidateid, vin_name, _vin_disease_value, valid_from, valid_to) "  # noqa: E501
+            "INSERT INTO vin_candidates (vin_candidateid, vin_name, _vin_disease_value, valid_from, valid_to) "
             "VALUES (?, ?, ?, ?, ?)",
             ("guid-candidate-2", "Candidate 2", "guid-tb-456", "2021-07-01", None),
         )
         db_manager.execute(
-            "INSERT INTO vin_candidates (vin_candidateid, vin_name, _vin_disease_value, valid_from, valid_to) "  # noqa: E501
+            "INSERT INTO vin_candidates (vin_candidateid, vin_name, _vin_disease_value, valid_from, valid_to) "
             "VALUES (?, ?, ?, ?, ?)",
             ("guid-candidate-3", "Candidate 3", "guid-malaria-999", "2021-08-01", None),
         )
@@ -211,18 +208,18 @@ class TestReferenceVerifierSCD2:
         """Test that NULL FK values are ignored (not reported as dangling)."""
         # Insert disease
         db_manager.execute(
-            "INSERT INTO vin_diseases (vin_diseaseid, vin_name, valid_from, valid_to) VALUES (?, ?, ?, ?)",  # noqa: E501
+            "INSERT INTO vin_diseases (vin_diseaseid, vin_name, valid_from, valid_to) VALUES (?, ?, ?, ?)",
             ("guid-hiv-123", "HIV/AIDS", "2020-01-01", None),
         )
 
         # Insert candidates with NULL FK (optional relationship)
         db_manager.execute(
-            "INSERT INTO vin_candidates (vin_candidateid, vin_name, _vin_disease_value, valid_from, valid_to) "  # noqa: E501
+            "INSERT INTO vin_candidates (vin_candidateid, vin_name, _vin_disease_value, valid_from, valid_to) "
             "VALUES (?, ?, ?, ?, ?)",
             ("guid-candidate-1", "Candidate 1", None, "2021-06-01", None),
         )
         db_manager.execute(
-            "INSERT INTO vin_candidates (vin_candidateid, vin_name, _vin_disease_value, valid_from, valid_to) "  # noqa: E501
+            "INSERT INTO vin_candidates (vin_candidateid, vin_name, _vin_disease_value, valid_from, valid_to) "
             "VALUES (?, ?, ?, ?, ?)",
             ("guid-candidate-2", "Candidate 2", "guid-hiv-123", "2021-07-01", None),
         )

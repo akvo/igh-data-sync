@@ -170,7 +170,7 @@ class DataverseClient:
                 "Accept": "application/json",
                 "OData-MaxVersion": "4.0",
                 "OData-Version": "4.0",
-                "Prefer": "odata.maxpagesize=5000,odata.include-annotations=\"OData.Community.Display.V1.FormattedValue\"",
+                "Prefer": 'odata.maxpagesize=5000,odata.include-annotations="OData.Community.Display.V1.FormattedValue"',
             }
 
             try:
@@ -209,10 +209,7 @@ class DataverseClient:
                             return await self.fetch_with_retry(url, params, attempt + 1)
                         else:
                             error_text = await response.text()
-                            msg = (
-                                f"Server error after {attempt + 1} attempts: "
-                                f"{response.status} - {error_text}"
-                            )
+                            msg = f"Server error after {attempt + 1} attempts: {response.status} - {error_text}"
                             raise RuntimeError(
                                 msg,
                             )
@@ -347,8 +344,7 @@ class DataverseClient:
         # Check if there's a next page (shouldn't be without orderby, but check anyway)
         if response.get("@odata.nextLink"):
             print(
-                f"    ⚠️  Warning: {entity_name} has more records but orderby failed. "
-                f"Only first 5000 fetched.",
+                f"    ⚠️  Warning: {entity_name} has more records but orderby failed. Only first 5000 fetched.",
             )
 
         return records

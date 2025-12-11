@@ -82,7 +82,7 @@ async def initialize_tables(_config, entities: list[EntityConfig], client, db_ma
 
     if config_path.exists():
         print(f"Loading option set configuration from {config_path}...")
-        with open(config_path, encoding="utf-8") as f:
+        with Path(config_path).open(encoding="utf-8") as f:
             option_set_fields_by_entity = json.load(f)
         total_fields = sum(len(fields) for fields in option_set_fields_by_entity.values())
         num_entities = len(option_set_fields_by_entity)

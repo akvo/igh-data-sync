@@ -270,9 +270,9 @@ python validate_schema.py --db-type sqlite
 # - Check specific entities have columns, PKs, FKs
 ```
 
-### 3. Automated Tests for Report Generation/Comparison to existing DB 
+### 3. Automated Tests for Report Generation/Comparison to existing DB
 ```python
-# - Use Saved Schema Parser Output 
+# - Use Saved Schema Parser Output
 # - Compare with database
 # - Generate reports - correctly detects differences
 ```
@@ -308,7 +308,7 @@ clean/
 │       ├── schema_comparer.py   # ~200 lines
 │       └── report_generator.py  # ~250 lines
 ├── tests/                         # Reusable utilities
-│   ├── ... #Tests following the lib file structure based on the component used as the test entrypoint (for unit tests and integration tests) 
+│   ├── ... #Tests following the lib file structure based on the component used as the test entrypoint (for unit tests and integration tests)
 └── README.md
 ```
 

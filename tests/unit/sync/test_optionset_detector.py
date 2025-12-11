@@ -1,7 +1,5 @@
 """Tests for option set detector."""
 
-import pytest
-
 from lib.sync.optionset_detector import OptionSetDetector
 
 

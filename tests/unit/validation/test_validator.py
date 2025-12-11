@@ -43,7 +43,7 @@ class TestValidator:
         db_manager.init_sync_tables()
 
         # Run validation
-        valid_entities, entities_to_create, diffs = await validate_schema_before_sync(
+        valid_entities, entities_to_create, _diffs = await validate_schema_before_sync(
             test_config,
             [test_entity],
             mock_client,

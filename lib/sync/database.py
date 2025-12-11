@@ -117,9 +117,7 @@ class DatabaseManager:
 
         print(f"  ✓ Created option set lookup table '{table_name}'")
 
-    def ensure_junction_table(
-        self, entity_name: str, field_name: str, entity_pk: str
-    ) -> None:
+    def ensure_junction_table(self, entity_name: str, field_name: str, entity_pk: str) -> None:
         """
         Create junction table for multi-select option set with temporal tracking.
 
@@ -181,36 +179,27 @@ class DatabaseManager:
         cursor = self.conn.cursor()
 
         # Check if code exists
-        # S608: SQL safe - table_name internally generated from field names
-        # (not user input), values parameterized
-        cursor.execute(f"SELECT label FROM {table_name} WHERE code = ?", (code,))  # noqa: S608
+        cursor.execute(f"SELECT label FROM {table_name} WHERE code = ?", (code,))  # noqa: S608 - table name from schema, values parameterized
         existing = cursor.fetchone()
 
         if existing:
             # Update label if changed (keep original first_seen)
             if existing[0] != label:
-                # S608: SQL safe - table_name internally generated from field names
-                # (not user input), values parameterized
                 cursor.execute(
-                    f"UPDATE {table_name} SET label = ? WHERE code = ?",  # noqa: S608
+                    f"UPDATE {table_name} SET label = ? WHERE code = ?",  # noqa: S608 - table name from schema, values parameterized
                     (label, code),
                 )
         else:
             # Insert new option
             first_seen = datetime.now(timezone.utc).isoformat()
-            # S608: SQL safe - table_name internally generated from field names
-
-            # (not user input), values parameterized
             cursor.execute(
-                f"INSERT INTO {table_name} (code, label, first_seen) VALUES (?, ?, ?)",  # noqa: S608
+                f"INSERT INTO {table_name} (code, label, first_seen) VALUES (?, ?, ?)",  # noqa: S608 - table name from schema, values parameterized
                 (code, label, first_seen),
             )
 
         self.conn.commit()
 
-    def upsert_junction_record(
-        self, entity_name: str, field_name: str, entity_id: str, option_code: int
-    ) -> None:
+    def upsert_junction_record(self, entity_name: str, field_name: str, entity_id: str, option_code: int) -> None:
         """
         Insert junction record for multi-select option set (backward compatibility).
 
@@ -238,16 +227,13 @@ class DatabaseManager:
 
         # from entity/field names (not user input), values parameterized
         cursor.execute(
-            f"INSERT OR IGNORE INTO {table_name} (entity_id, option_code, valid_from, valid_to) "  # noqa: S608
-            f"VALUES (?, ?, ?, NULL)",
+            f"INSERT OR IGNORE INTO {table_name} (entity_id, option_code, valid_from, valid_to) VALUES (?, ?, ?, NULL)",  # noqa: S608 - table/column names from schema, values parameterized
             (entity_id, option_code, current_time),
         )
 
         self.conn.commit()
 
-    def clear_junction_records(
-        self, entity_name: str, field_name: str, entity_id: str
-    ) -> None:
+    def clear_junction_records(self, entity_name: str, field_name: str, entity_id: str) -> None:
         """
         Clear all junction records for an entity before re-inserting.
 
@@ -269,7 +255,7 @@ class DatabaseManager:
         # S608: SQL safe - table_name internally generated
 
         # from entity/field names (not user input), values parameterized
-        cursor.execute(f"DELETE FROM {table_name} WHERE entity_id = ?", (entity_id,))  # noqa: S608
+        cursor.execute(f"DELETE FROM {table_name} WHERE entity_id = ?", (entity_id,))  # noqa: S608 - table/column names from schema, values parameterized
         self.conn.commit()
 
     def snapshot_junction_relationships(
@@ -302,8 +288,7 @@ class DatabaseManager:
 
         # from entity/field names (not user input), values parameterized
         cursor.execute(
-            f"UPDATE {table_name} SET valid_to = ? "  # noqa: S608
-            f"WHERE entity_id = ? AND valid_to IS NULL",
+            f"UPDATE {table_name} SET valid_to = ? WHERE entity_id = ? AND valid_to IS NULL",  # noqa: S608 - table/column names from schema, values parameterized
             (valid_from, entity_id),
         )
 
@@ -314,8 +299,7 @@ class DatabaseManager:
 
                 # (not user input), values parameterized
                 cursor.execute(
-                    f"INSERT INTO {table_name} (entity_id, option_code, valid_from, valid_to) "  # noqa: S608
-                    f"VALUES (?, ?, ?, NULL)",
+                    f"INSERT INTO {table_name} (entity_id, option_code, valid_from, valid_to) VALUES (?, ?, ?, NULL)",  # noqa: S608 - table/column names from schema, values parameterized
                     (entity_id, code, valid_from),
                 )
 
@@ -354,9 +338,7 @@ class DatabaseManager:
                     # OLD APPROACH (backward compatibility): Clear and re-insert
                     self.clear_junction_records(entity_name, field_name, entity_id)
                     for code in option_set.codes_and_labels:
-                        self.upsert_junction_record(
-                            entity_name, field_name, entity_id, code
-                        )
+                        self.upsert_junction_record(entity_name, field_name, entity_id, code)
                 # NEW APPROACH (SCD2): Snapshot only when parent version changes
                 elif scd2_result.version_created:
                     table_name = f"_junction_{entity_name}_{field_name}"
@@ -397,7 +379,7 @@ class DatabaseManager:
         # S608: SQL safe - table/column names from EntityConfig/TableSchema
 
         # (not user input), values parameterized
-        cursor.execute(f"SELECT 1 FROM {table_name} WHERE {primary_key} = ?", (pk_value,))  # noqa: S608
+        cursor.execute(f"SELECT 1 FROM {table_name} WHERE {primary_key} = ?", (pk_value,))  # noqa: S608 - table/column names from schema, values parameterized
         is_new = cursor.fetchone() is None
 
         # Build INSERT OR REPLACE
@@ -408,7 +390,7 @@ class DatabaseManager:
         # S608: SQL safe - table/column names from EntityConfig/TableSchema
 
         # (not user input), values parameterized
-        sql = f"INSERT OR REPLACE INTO {table_name} ({column_list}) VALUES ({placeholders})"  # noqa: S608
+        sql = f"INSERT OR REPLACE INTO {table_name} ({column_list}) VALUES ({placeholders})"  # noqa: S608 - table/column names from schema, values parameterized
         values = tuple(record[col] for col in columns)
 
         cursor.execute(sql, values)
@@ -416,9 +398,7 @@ class DatabaseManager:
 
         return is_new
 
-    def upsert_scd2(
-        self, table_name: str, business_key: str, record: dict[str, Any]
-    ) -> SCD2Result:
+    def upsert_scd2(self, table_name: str, business_key: str, record: dict[str, Any]) -> SCD2Result:
         """
         Insert or update record using SCD2 (Slowly Changing Dimension Type 2) logic.
 
@@ -456,8 +436,7 @@ class DatabaseManager:
 
         # (not user input), values parameterized
         cursor.execute(
-            f"SELECT row_id, json_response FROM {table_name} "  # noqa: S608
-            f"WHERE {business_key} = ? AND valid_to IS NULL",
+            f"SELECT row_id, json_response FROM {table_name} WHERE {business_key} = ? AND valid_to IS NULL",  # noqa: S608 - table/column names from schema, values parameterized
             (business_key_value,),
         )
         active_record = cursor.fetchone()
@@ -476,7 +455,7 @@ class DatabaseManager:
             # S608: SQL safe - table/column names from EntityConfig/TableSchema
 
             # (not user input), values parameterized
-            sql = f"INSERT INTO {table_name} ({column_list}) VALUES ({placeholders})"  # noqa: S608
+            sql = f"INSERT INTO {table_name} ({column_list}) VALUES ({placeholders})"  # noqa: S608 - table/column names from schema, values parameterized
             cursor.execute(sql, tuple(values))
             self.conn.commit()
 
@@ -494,9 +473,8 @@ class DatabaseManager:
         # Compare json_response to detect changes
         if old_json_response == new_json_response:
             # No change detected - optionally update sync_time
-            # S608: SQL safe - table name from EntityConfig (not user input), values parameterized
             cursor.execute(
-                f"UPDATE {table_name} SET sync_time = ? WHERE row_id = ?",  # noqa: S608
+                f"UPDATE {table_name} SET sync_time = ? WHERE row_id = ?",  # noqa: S608 - table/column names from schema, values parameterized
                 (record.get("sync_time"), row_id),
             )
             self.conn.commit()
@@ -509,9 +487,8 @@ class DatabaseManager:
 
         # STEP 4: Data changed - close old record and insert new
         # Close old record by setting valid_to
-        # S608: SQL safe - table name from EntityConfig (not user input), values parameterized
         cursor.execute(
-            f"UPDATE {table_name} SET valid_to = ? WHERE row_id = ?",  # noqa: S608
+            f"UPDATE {table_name} SET valid_to = ? WHERE row_id = ?",  # noqa: S608 - table/column names from schema, values parameterized
             (new_valid_from, row_id),
         )
 
@@ -527,7 +504,7 @@ class DatabaseManager:
         # S608: SQL safe - table/column names from EntityConfig/TableSchema
 
         # (not user input), values parameterized
-        sql = f"INSERT INTO {table_name} ({column_list}) VALUES ({placeholders})"  # noqa: S608
+        sql = f"INSERT INTO {table_name} ({column_list}) VALUES ({placeholders})"  # noqa: S608 - table/column names from schema, values parameterized
         cursor.execute(sql, tuple(values))
         self.conn.commit()
 
@@ -592,9 +569,7 @@ class DatabaseManager:
             # Add special columns
             record["json_response"] = json.dumps(api_record)
             record["sync_time"] = datetime.now(timezone.utc).isoformat()
-            record["valid_from"] = api_record.get("modifiedon") or datetime.now(
-                timezone.utc
-            ).isoformat()
+            record["valid_from"] = api_record.get("modifiedon") or datetime.now(timezone.utc).isoformat()
 
             # STEP 3: Upsert entity record using SCD2 logic
             scd2_result = self.upsert_scd2(table_name, primary_key, record)
@@ -670,6 +645,6 @@ class DatabaseManager:
 
         # (not user input), values parameterized
         cursor.execute(
-            f"SELECT DISTINCT {column_name} FROM {table_name} WHERE {column_name} IS NOT NULL",  # noqa: S608
+            f"SELECT DISTINCT {column_name} FROM {table_name} WHERE {column_name} IS NOT NULL",  # noqa: S608 - table/column names from schema, values parameterized
         )
         return {row[0] for row in cursor.fetchall()}

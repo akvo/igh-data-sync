@@ -1,6 +1,6 @@
 """Fake DataverseClient for E2E testing without real API calls."""
 
-from typing import Any
+from typing import Any, Optional
 
 
 class FakeDataverseClient:
@@ -46,9 +46,9 @@ class FakeDataverseClient:
     async def fetch_all_pages(
         self,
         entity_name: str,
-        orderby: str = None,
-        filter_query: str = None,
-        select: str = None,
+        orderby: Optional[str] = None,  # noqa: ARG002 - part of API contract, unused in fake
+        filter_query: Optional[str] = None,
+        select: Optional[str] = None,  # noqa: ARG002 - part of API contract, unused in fake
     ) -> list[dict[str, Any]]:
         """Return canned entity records."""
         records = self._entity_responses.get(entity_name, [])
@@ -61,10 +61,10 @@ class FakeDataverseClient:
                 records = [r for r in records if r.get("modifiedon", "") > timestamp]
 
             # Handle ID-based filters (filtered sync)
-            # Pattern: "accountid eq 'a1'" or "accountid eq 'a1' or accountid eq 'a2' or ..."
+            # Pattern: "accountid eq 'a1'" or "accountid eq 'a1' or accountid eq 'a2' or ..."  # noqa: ERA001 - example pattern for reference
             elif " eq " in filter_query:
                 # Extract field name (e.g., "accountid")
-                field_name = filter_query.split(" eq ")[0].strip()
+                field_name = filter_query.split(" eq ", maxsplit=1)[0].strip()
 
                 # Extract all IDs from the filter
                 # Split by " or " and extract the value from each part

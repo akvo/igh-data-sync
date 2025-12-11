@@ -15,11 +15,11 @@ class EntityRelationships:
     """Relationships for a single entity."""
 
     # Entities this entity references: (table, fk_column, referenced_column)
-    # Example: [("vin_diseases", "_vin_disease_value", "vin_diseaseid"), ...]  # noqa: ERA001
+    # Example: [("vin_diseases", "_vin_disease_value", "vin_diseaseid"), ...]  # noqa: ERA001 - example for documentation
     references_to: list[tuple[str, str, str]] = field(default_factory=list)
 
     # Entities that reference this entity: (table, fk_column, referenced_column)
-    # Example: [("vin_candidates", "_vin_disease_value", "vin_diseaseid"), ...]  # noqa: ERA001
+    # Example: [("vin_candidates", "_vin_disease_value", "vin_diseaseid"), ...]  # noqa: ERA001 - example for documentation
     referenced_by: list[tuple[str, str, str]] = field(default_factory=list)
 
 
@@ -96,15 +96,19 @@ class RelationshipGraph:
 
                 # Record: this entity references the other entity
                 # Include referenced_column for SCD2 (business key, not surrogate key)
-                graph.relationships[api_name].references_to.append(
-                    (referenced_api_name, fk.column, fk.referenced_column)
-                )
+                graph.relationships[api_name].references_to.append((
+                    referenced_api_name,
+                    fk.column,
+                    fk.referenced_column,
+                ))
 
                 # Record: other entity is referenced by this entity
                 # Include referenced_column for SCD2 (business key, not surrogate key)
-                graph.relationships[referenced_api_name].referenced_by.append(
-                    (api_name, fk.column, fk.referenced_column)
-                )
+                graph.relationships[referenced_api_name].referenced_by.append((
+                    api_name,
+                    fk.column,
+                    fk.referenced_column,
+                ))
 
         return graph
 

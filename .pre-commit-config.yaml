@@ -56,13 +56,12 @@ repos:
         args: [--fix=lf]
 
   # Run tests before commit (optional, can be commented out if too slow)
-  # Uncomment this after pytest migration is complete
-  # - repo: local
-  #   hooks:
-  #     - id: pytest
-  #       name: pytest
-  #       entry: pytest
-  #       language: system
-  #       pass_filenames: false
-  #       always_run: true
-  #       args: [--maxfail=1, -q]
+  - repo: local
+    hooks:
+      - id: pytest
+        name: pytest
+        entry: pytest
+        language: system
+        pass_filenames: false
+        always_run: true
+        args: [--maxfail=1, -q]

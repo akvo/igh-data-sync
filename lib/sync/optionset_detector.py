@@ -31,9 +31,7 @@ class OptionSetDetector:
             # Look for @FormattedValue annotations
             if key.endswith("@OData.Community.Display.V1.FormattedValue"):
                 # Extract base field name
-                field_name = key.replace(
-                    "@OData.Community.Display.V1.FormattedValue", ""
-                )
+                field_name = key.replace("@OData.Community.Display.V1.FormattedValue", "")
 
                 # Get raw value
                 raw_value = api_record.get(field_name)
@@ -46,9 +44,7 @@ class OptionSetDetector:
                 is_multi_select = self._is_multi_select(raw_value, formatted_value)
 
                 # Extract codes and labels
-                codes_and_labels = self._extract_codes_and_labels(
-                    raw_value, formatted_value, is_multi_select
-                )
+                codes_and_labels = self._extract_codes_and_labels(raw_value, formatted_value, is_multi_select)
 
                 if codes_and_labels:
                     detected[field_name] = DetectedOptionSet(
@@ -59,7 +55,8 @@ class OptionSetDetector:
 
         return detected
 
-    def _is_multi_select(self, raw_value: any, formatted_value: str) -> bool:
+    @staticmethod
+    def _is_multi_select(raw_value: any, formatted_value: str) -> bool:
         """
         Determine if this is a multi-select option set.
 
@@ -69,13 +66,10 @@ class OptionSetDetector:
         """
         if isinstance(formatted_value, str) and ";" in formatted_value:
             return True
-        if isinstance(raw_value, str) and "," in raw_value:
-            return True
-        return False
+        return bool(isinstance(raw_value, str) and "," in raw_value)
 
-    def _extract_codes_and_labels(
-        self, raw_value: any, formatted_value: str, is_multi_select: bool
-    ) -> dict[int, str]:
+    @staticmethod
+    def _extract_codes_and_labels(raw_value: any, formatted_value: str, is_multi_select: bool) -> dict[int, str]:
         """
         Extract code-label mappings.
 
@@ -93,22 +87,15 @@ class OptionSetDetector:
             if is_multi_select:
                 # Multi-select: Parse comma-separated codes and semicolon-separated labels
                 if isinstance(raw_value, str):
-                    codes = [
-                        int(c.strip()) for c in raw_value.split(",") if c.strip()
-                    ]
+                    codes = [int(c.strip()) for c in raw_value.split(",") if c.strip()]
                 else:
                     # Sometimes multi-select raw values are already integers
                     codes = [int(raw_value)]
 
-                labels = [
-                    label.strip()
-                    for label in formatted_value.split(";")
-                    if label.strip()
-                ]
+                labels = [label.strip() for label in formatted_value.split(";") if label.strip()]
 
                 # Match codes to labels
-                for code, label in zip(codes, labels):
-                    codes_and_labels[code] = label
+                codes_and_labels.update(dict(zip(codes, labels)))
 
             else:
                 # Single-select: Direct mapping

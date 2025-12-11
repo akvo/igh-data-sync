@@ -69,7 +69,7 @@ class DataverseAuth:
                 )
 
             tenant_id = match.group(1)
-            return tenant_id
+            return tenant_id  # noqa: TRY300 - clear flow, no benefit from else block
 
         except requests.RequestException as e:
             msg = f"Failed to discover tenant ID: {e}"
@@ -114,7 +114,7 @@ class DataverseAuth:
             self.token = access_token
             self.token_expiry = time.time() + expires_in
 
-            return access_token
+            return access_token  # noqa: TRY300 - clear flow, no benefit from else block
 
         except requests.RequestException as e:
             msg = f"Authentication failed: {e}"

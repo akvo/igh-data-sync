@@ -48,9 +48,7 @@ async def validate_schema_before_sync(config, entities, client, _db_manager):
                 {
                     "entity": plural_name,
                     "severity": "warning",
-                    "description": (
-                        f"Entity '{singular_name}' in config but not in $metadata - skipping"
-                    ),
+                    "description": (f"Entity '{singular_name}' in config but not in $metadata - skipping"),
                 },
             )
             continue
@@ -75,15 +73,15 @@ async def validate_schema_before_sync(config, entities, client, _db_manager):
                 {singular_name: dv_schema},
                 {plural_name: db_schema},
             )
-            for diff in entity_diffs:
-                differences.append(
-                    {
-                        "entity": diff.entity,
-                        "severity": diff.severity,
-                        "description": diff.description,
-                        "details": diff.details,
-                    },
-                )
+            differences.extend(
+                {
+                    "entity": diff.entity,
+                    "severity": diff.severity,
+                    "description": diff.description,
+                    "details": diff.details,
+                }
+                for diff in entity_diffs
+            )
             valid_entities.append(entity)
 
     # Analyze and report
@@ -107,7 +105,7 @@ def _report_validation_results(differences):
         for diff in warnings:
             print(f"    ⚠️  WARNING [{diff['entity']}]: {diff['description']}")
         for diff in infos:
-            print(f"    ℹ️  INFO [{diff['entity']}]: {diff['description']}")
+            print(f"    ℹ️  INFO [{diff['entity']}]: {diff['description']}")  # noqa: RUF001 - info emoji for user-facing output
 
     # Exit if errors
     if errors:

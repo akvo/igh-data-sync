@@ -101,10 +101,8 @@ async def test_schema_creation_with_config_creates_integer_columns(
     config_path = temp_config_dir / "config" / "optionsets.json"
     config_path.parent.mkdir(parents=True, exist_ok=True)
 
-    config_data = {
-        "vin_disease": ["statuscode", "new_globalhealtharea"]
-    }
-    with open(config_path, "w", encoding="utf-8") as f:
+    config_data = {"vin_disease": ["statuscode", "new_globalhealtharea"]}
+    with Path(config_path).open("w", encoding="utf-8") as f:
         json.dump(config_data, f)
 
     # Change to temp config dir so config is found
@@ -147,9 +145,7 @@ async def test_schema_creation_with_config_creates_integer_columns(
 
 
 @pytest.mark.asyncio
-async def test_config_file_with_multiple_entities(
-    temp_db, temp_config_dir, monkeypatch
-):
+async def test_config_file_with_multiple_entities(temp_db, temp_config_dir, monkeypatch):
     """Config should correctly map option sets for multiple entities."""
     # Create config with multiple entities
     config_path = temp_config_dir / "config" / "optionsets.json"
@@ -159,7 +155,7 @@ async def test_config_file_with_multiple_entities(
         "vin_disease": ["statuscode", "new_globalhealtharea"],
         "vin_product": ["statuscode", "vin_type"],
     }
-    with open(config_path, "w", encoding="utf-8") as f:
+    with Path(config_path).open("w", encoding="utf-8") as f:
         json.dump(config_data, f)
 
     monkeypatch.chdir(temp_config_dir)
@@ -238,7 +234,7 @@ async def test_config_loading_shows_informative_messages(
     config_path.parent.mkdir(parents=True, exist_ok=True)
 
     config_data = {"vin_disease": ["statuscode", "new_globalhealtharea"]}
-    with open(config_path, "w", encoding="utf-8") as f:
+    with Path(config_path).open("w", encoding="utf-8") as f:
         json.dump(config_data, f)
 
     monkeypatch.chdir(temp_config_dir)
@@ -270,9 +266,7 @@ async def test_config_loading_shows_informative_messages(
 
 
 @pytest.mark.asyncio
-async def test_no_config_shows_warning_message(
-    mock_metadata_xml, temp_db, temp_config_dir, monkeypatch, capsys
-):
+async def test_no_config_shows_warning_message(mock_metadata_xml, temp_db, temp_config_dir, monkeypatch, capsys):
     """Without config, should show helpful warning."""
     # No config file created
     monkeypatch.chdir(temp_config_dir)

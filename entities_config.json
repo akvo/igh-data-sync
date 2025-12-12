@@ -1,0 +1,125 @@
+{
+  "entities": [
+    {
+      "name": "vin_candidate",
+      "filtered": false,
+      "description": "All candidate records"
+    },
+    {
+      "name": "vin_product",
+      "filtered": false,
+      "description": "All product records"
+    },
+    {
+      "name": "vin_disease",
+      "filtered": false,
+      "description": "All disease records"
+    },
+    {
+      "name": "vin_clinicaltrial",
+      "filtered": false,
+      "description": "All clinical trial records"
+    },
+    {
+      "name": "vin_source",
+      "filtered": false,
+      "description": "All source records"
+    },
+    {
+      "name": "vin_rdstage",
+      "filtered": false,
+      "description": "All R&D stage records"
+    },
+    {
+      "name": "vin_rdstageproduct",
+      "filtered": false,
+      "description": "All R&D stage product records"
+    },
+    {
+      "name": "vin_rdpriority",
+      "filtered": false,
+      "description": "All R&D priority records"
+    },
+    {
+      "name": "vin_archetype",
+      "filtered": false,
+      "description": "All archetype records"
+    },
+    {
+      "name": "vin_clinicalusestatus",
+      "filtered": false,
+      "description": "All clinical use status records"
+    },
+    {
+      "name": "vin_country",
+      "filtered": false,
+      "description": "All country records"
+    },
+    {
+      "name": "vin_region",
+      "filtered": false,
+      "description": "All region records"
+    },
+    {
+      "name": "account",
+      "filtered": true,
+      "description": "Only accounts linked to downloaded candidates/trials via junction tables"
+    },
+    {
+      "name": "contact",
+      "filtered": true,
+      "description": "Only contacts linked to downloaded records via foreign keys"
+    },
+    {
+      "name": "systemuser",
+      "filtered": false,
+      "description": "All system user records"
+    },
+    {
+      "name": "vin_vin_candidate_account",
+      "filtered": false,
+      "description": "Junction table: candidate-account relationships"
+    },
+    {
+      "name": "vin_vin_candidate_vin_rdpriority",
+      "filtered": false,
+      "description": "Junction table: candidate-rdpriority relationships"
+    },
+    {
+      "name": "vin_vin_candidate_systemuser",
+      "filtered": false,
+      "description": "Junction table: candidate-systemuser relationships"
+    },
+    {
+      "name": "vin_vin_candidate_vin_country",
+      "filtered": false,
+      "description": "Junction table: candidate-country relationships"
+    },
+    {
+      "name": "vin_vin_candidate_vin_region",
+      "filtered": false,
+      "description": "Junction table: candidate-region relationships"
+    },
+    {
+      "name": "vin_vin_clinicaltrial_account",
+      "filtered": false,
+      "description": "Junction table: clinicaltrial-account relationships"
+    },
+    {
+      "name": "vin_vin_clinicaltrial_account_collaborator",
+      "filtered": false,
+      "description": "Junction table: clinicaltrial-account collaborator relationships"
+    },
+    {
+      "name": "vin_vin_clinicaltrial_vin_country",
+      "filtered": false,
+      "description": "Junction table: clinicaltrial-country relationships"
+    }
+  ],
+  "metadata": {
+    "total_entities": 23,
+    "filtered_entities": 2,
+    "unfiltered_entities": 21,
+    "description": "Configuration for Dataverse entity sync - specifies which entities are synced in full vs filtered by foreign key relationships"
+  }
+}

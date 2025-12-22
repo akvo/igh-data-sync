@@ -1,6 +1,7 @@
 """Async HTTP client for Dataverse API."""
 
 import asyncio
+import json
 from typing import Optional, Union
 
 import aiohttp
@@ -34,8 +35,9 @@ class DataverseClient:
 
     async def __aenter__(self):
         """Async context manager entry."""
-        # Set generous timeouts for large $metadata XML downloads (~7 MB)
-        timeout = aiohttp.ClientTimeout(total=600, connect=60, sock_read=300)
+        # Set generous timeouts for large responses (~50 MB for vin_candidates)
+        # sock_read increased to 600s to handle slow chunked transfer of large entities
+        timeout = aiohttp.ClientTimeout(total=1200, connect=60, sock_read=600)
         self.session = aiohttp.ClientSession(timeout=timeout)
         return self
 
@@ -220,7 +222,8 @@ class DataverseClient:
                         msg = f"API request failed: {response.status} - {error_text}"
                         raise RuntimeError(msg)
 
-                    return await response.json()
+                    # Parse JSON with error handling for truncated responses
+                    return await self._parse_json_with_retry(response, attempt, url, params)
 
             except (aiohttp.ClientError, asyncio.TimeoutError) as e:
                 # Retry on network errors
@@ -230,6 +233,31 @@ class DataverseClient:
                 else:
                     msg = f"Network error after {attempt + 1} attempts: {e}"
                     raise RuntimeError(msg) from e
+
+    async def _parse_json_with_retry(self, response, attempt, url, params):
+        """Parse JSON response with retry on decode errors (truncated responses)."""
+        try:
+            return await response.json()
+        except json.JSONDecodeError as e:
+            # Response may be truncated due to timeout or network issue
+            # Try to get response size for diagnostics
+            try:
+                text = await response.text()
+                text_len = len(text)
+            except Exception:
+                text_len = "unknown"
+
+            # Retry on JSON parse errors (likely truncated response)
+            if attempt < len(self.retry_delays):
+                print(
+                    f"    ⚠️  JSON parse error (pos {e.pos}, len {text_len}), "
+                    f"retrying in {self.retry_delays[attempt]}s...",
+                )
+                await asyncio.sleep(self.retry_delays[attempt])
+                return await self.fetch_with_retry(url, params, attempt + 1)
+
+            msg = f"JSON parse failed after {attempt + 1} attempts: {e} (response length: {text_len})"
+            raise RuntimeError(msg) from e
 
     async def fetch_all_pages(
         self,

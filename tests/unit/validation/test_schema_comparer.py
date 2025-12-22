@@ -212,4 +212,4 @@ class TestSchemaComparer:
 
         fk_diffs = [d for d in differences if d.issue_type == "fk_missing"]
         assert len(fk_diffs) == 1
-        assert fk_diffs[0].severity == "warning"
+        assert fk_diffs[0].severity == "info"  # FK constraints not created by design

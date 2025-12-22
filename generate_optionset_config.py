@@ -76,9 +76,16 @@ def extract_option_sets(db_path: str) -> dict[str, list[str]]:
         for entity_table in entity_tables:
             # Check if this entity has the field
             cursor.execute(f"PRAGMA table_info({entity_table})")
-            columns = [col[1] for col in cursor.fetchall()]
+            columns = {col[1]: col[2] for col in cursor.fetchall()}  # name -> type
 
             if field_name in columns:
+                # IMPORTANT: Only include INTEGER fields (single-select option sets)
+                # TEXT fields are multi-select option sets and must stay as TEXT
+                column_type = columns[field_name]
+                if column_type != "INTEGER":
+                    print(f"  ⊘ {entity_table}.{field_name} (skipped: {column_type}, not INTEGER)", file=sys.stderr)
+                    continue
+
                 # Look up the correct singular entity name from config
                 entity_name = table_to_entity.get(entity_table)
 

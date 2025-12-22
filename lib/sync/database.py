@@ -567,7 +567,9 @@ class DatabaseManager:
                     record[col.name] = value
 
             # Add special columns
-            record["json_response"] = json.dumps(api_record)
+            # Remove OData metadata fields that change on every fetch (not actual data changes)
+            api_record_clean = {k: v for k, v in api_record.items() if not k.startswith("@odata.")}
+            record["json_response"] = json.dumps(api_record_clean, sort_keys=True)
             record["sync_time"] = datetime.now(timezone.utc).isoformat()
             record["valid_from"] = api_record.get("modifiedon") or datetime.now(timezone.utc).isoformat()
 
@@ -575,8 +577,9 @@ class DatabaseManager:
             scd2_result = self.upsert_scd2(table_name, primary_key, record)
             if scd2_result.is_new_entity:
                 added += 1
-            else:
+            elif scd2_result.version_created:
                 updated += 1
+            # else: no change detected, sync_time updated only
 
             # STEP 4: Populate option set data (lookup and junction tables)
             # Pass scd2_result to enable temporal tracking of junction relationships

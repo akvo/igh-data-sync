@@ -239,8 +239,8 @@ class SchemaComparer:
                     SchemaDifference(
                         entity=entity_name,
                         issue_type="fk_missing",
-                        severity="warning",  # FKs are often optional in databases
-                        description=f"Foreign key on column '{dv_fk.column}' missing",
+                        severity="info",  # FK constraints not created - relationships queryable via JOIN
+                        description=f"Column '{dv_fk.column}' has no FK constraint (use JOIN to query relationship)",
                         details={
                             "column": dv_fk.column,
                             "expected_references": (f"{dv_fk.referenced_table}.{dv_fk.referenced_column}"),

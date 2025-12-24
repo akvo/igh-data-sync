@@ -185,15 +185,22 @@ class FilteredSyncManager:
         if not last_timestamp:
             return ids, set()
 
+        if not ids:
+            return set(), set()
+
+        # SQLite has a limit of 999 variables per query - batch if needed
+        batch_size = 999
         existing_ids = set()
         cursor = self.db_manager.conn.cursor()
-        for id_val in ids:
-            cursor.execute(
-                f"SELECT 1 FROM {entity_api_name} WHERE {primary_key} = ? LIMIT 1",  # noqa: S608 - table/column names from schema, values parameterized
-                (id_val,),
-            )
-            if cursor.fetchone():
-                existing_ids.add(id_val)
+        ids_list = list(ids)
+
+        for i in range(0, len(ids_list), batch_size):
+            batch = ids_list[i : i + batch_size]
+            placeholders = ",".join(["?" for _ in batch])
+            query = f"SELECT {primary_key} FROM {entity_api_name} WHERE {primary_key} IN ({placeholders})"  # noqa: S608 - table/column names from schema, values parameterized
+            cursor.execute(query, batch)
+            # Convert results to strings to match input ID type (API IDs are strings)
+            existing_ids.update(str(row[0]) for row in cursor.fetchall())
 
         new_ids = ids - existing_ids
         return new_ids, existing_ids

@@ -392,6 +392,9 @@ python sync_dataverse.py
 mkdir -p config
 python generate_optionset_config.py > config/optionsets.json
 
+# Or with custom database path:
+# python generate_optionset_config.py --db /path/to/my.db > config/optionsets.json
+
 # 3. Review generated config
 cat config/optionsets.json
 
@@ -399,6 +402,10 @@ cat config/optionsets.json
 rm dataverse_complete.db
 python sync_dataverse.py
 ```
+
+**Configuration Options:**
+- `--db PATH`: Specify custom database path (default: `dataverse_complete.db`)
+- Run `python generate_optionset_config.py --help` for more options
 
 **After setup:** The config is loaded automatically on every sync. Regenerate when adding new entities or if Dataverse schema changes.
 

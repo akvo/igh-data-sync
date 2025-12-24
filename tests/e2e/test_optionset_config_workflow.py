@@ -62,34 +62,31 @@ async def test_schema_creation_without_config_creates_text_columns(
     mock_client.get_metadata = AsyncMock(return_value=mock_metadata_xml)
 
     # Create database manager
-    db_manager = DatabaseManager(temp_db)
-    db_manager.connect()
-    db_manager.init_sync_tables()
+    with DatabaseManager(temp_db) as db_manager:
+        db_manager.init_sync_tables()
 
-    # Define entity config
-    entities = [
-        EntityConfig(
-            name="vin_disease",
-            api_name="vin_diseases",
-            filtered=False,
-            description="Test entity",
-        )
-    ]
+        # Define entity config
+        entities = [
+            EntityConfig(
+                name="vin_disease",
+                api_name="vin_diseases",
+                filtered=False,
+                description="Test entity",
+            )
+        ]
 
-    # Initialize tables without config
-    await initialize_tables(None, entities, mock_client, db_manager)
+        # Initialize tables without config
+        await initialize_tables(None, entities, mock_client, db_manager)
 
-    # Verify table was created
-    cursor = db_manager.conn.cursor()
-    cursor.execute("SELECT sql FROM sqlite_master WHERE name='vin_diseases'")
-    create_sql = cursor.fetchone()[0]
+        # Verify table was created
+        cursor = db_manager.conn.cursor()
+        cursor.execute("SELECT sql FROM sqlite_master WHERE name='vin_diseases'")
+        create_sql = cursor.fetchone()[0]
 
-    # Check that option set fields are TEXT (without config)
-    assert "statuscode TEXT" in create_sql
-    assert "new_globalhealtharea TEXT" in create_sql
-    assert "vin_name TEXT" in create_sql
-
-    db_manager.close()
+        # Check that option set fields are TEXT (without config)
+        assert "statuscode TEXT" in create_sql
+        assert "new_globalhealtharea TEXT" in create_sql
+        assert "vin_name TEXT" in create_sql
 
 
 @pytest.mark.asyncio
@@ -113,35 +110,32 @@ async def test_schema_creation_with_config_creates_integer_columns(
     mock_client.get_metadata = AsyncMock(return_value=mock_metadata_xml)
 
     # Create database manager
-    db_manager = DatabaseManager(temp_db)
-    db_manager.connect()
-    db_manager.init_sync_tables()
+    with DatabaseManager(temp_db) as db_manager:
+        db_manager.init_sync_tables()
 
-    # Define entity config
-    entities = [
-        EntityConfig(
-            name="vin_disease",
-            api_name="vin_diseases",
-            filtered=False,
-            description="Test entity",
-        )
-    ]
+        # Define entity config
+        entities = [
+            EntityConfig(
+                name="vin_disease",
+                api_name="vin_diseases",
+                filtered=False,
+                description="Test entity",
+            )
+        ]
 
-    # Initialize tables with config
-    await initialize_tables(None, entities, mock_client, db_manager)
+        # Initialize tables with config
+        await initialize_tables(None, entities, mock_client, db_manager)
 
-    # Verify table was created
-    cursor = db_manager.conn.cursor()
-    cursor.execute("SELECT sql FROM sqlite_master WHERE name='vin_diseases'")
-    create_sql = cursor.fetchone()[0]
+        # Verify table was created
+        cursor = db_manager.conn.cursor()
+        cursor.execute("SELECT sql FROM sqlite_master WHERE name='vin_diseases'")
+        create_sql = cursor.fetchone()[0]
 
-    # Check that option set fields are INTEGER (with config)
-    assert "statuscode INTEGER" in create_sql
-    assert "new_globalhealtharea INTEGER" in create_sql
-    # Regular string field should still be TEXT
-    assert "vin_name TEXT" in create_sql
-
-    db_manager.close()
+        # Check that option set fields are INTEGER (with config)
+        assert "statuscode INTEGER" in create_sql
+        assert "new_globalhealtharea INTEGER" in create_sql
+        # Regular string field should still be TEXT
+        assert "vin_name TEXT" in create_sql
 
 
 @pytest.mark.asyncio
@@ -185,43 +179,40 @@ async def test_config_file_with_multiple_entities(temp_db, temp_config_dir, monk
     mock_client = AsyncMock()
     mock_client.get_metadata = AsyncMock(return_value=multi_entity_xml)
 
-    db_manager = DatabaseManager(temp_db)
-    db_manager.connect()
-    db_manager.init_sync_tables()
+    with DatabaseManager(temp_db) as db_manager:
+        db_manager.init_sync_tables()
 
-    entities = [
-        EntityConfig(
-            name="vin_disease",
-            api_name="vin_diseases",
-            filtered=False,
-            description="Test disease",
-        ),
-        EntityConfig(
-            name="vin_product",
-            api_name="vin_products",
-            filtered=False,
-            description="Test product",
-        ),
-    ]
+        entities = [
+            EntityConfig(
+                name="vin_disease",
+                api_name="vin_diseases",
+                filtered=False,
+                description="Test disease",
+            ),
+            EntityConfig(
+                name="vin_product",
+                api_name="vin_products",
+                filtered=False,
+                description="Test product",
+            ),
+        ]
 
-    await initialize_tables(None, entities, mock_client, db_manager)
+        await initialize_tables(None, entities, mock_client, db_manager)
 
-    cursor = db_manager.conn.cursor()
+        cursor = db_manager.conn.cursor()
 
-    # Check vin_diseases
-    cursor.execute("SELECT sql FROM sqlite_master WHERE name='vin_diseases'")
-    diseases_sql = cursor.fetchone()[0]
-    assert "statuscode INTEGER" in diseases_sql
-    assert "new_globalhealtharea INTEGER" in diseases_sql
+        # Check vin_diseases
+        cursor.execute("SELECT sql FROM sqlite_master WHERE name='vin_diseases'")
+        diseases_sql = cursor.fetchone()[0]
+        assert "statuscode INTEGER" in diseases_sql
+        assert "new_globalhealtharea INTEGER" in diseases_sql
 
-    # Check vin_products
-    cursor.execute("SELECT sql FROM sqlite_master WHERE name='vin_products'")
-    products_sql = cursor.fetchone()[0]
-    assert "statuscode INTEGER" in products_sql
-    assert "vin_type INTEGER" in products_sql
-    assert "vin_name TEXT" in products_sql  # Not in config
-
-    db_manager.close()
+        # Check vin_products
+        cursor.execute("SELECT sql FROM sqlite_master WHERE name='vin_products'")
+        products_sql = cursor.fetchone()[0]
+        assert "statuscode INTEGER" in products_sql
+        assert "vin_type INTEGER" in products_sql
+        assert "vin_name TEXT" in products_sql  # Not in config
 
 
 @pytest.mark.asyncio
@@ -242,27 +233,24 @@ async def test_config_loading_shows_informative_messages(
     mock_client = AsyncMock()
     mock_client.get_metadata = AsyncMock(return_value=mock_metadata_xml)
 
-    db_manager = DatabaseManager(temp_db)
-    db_manager.connect()
-    db_manager.init_sync_tables()
+    with DatabaseManager(temp_db) as db_manager:
+        db_manager.init_sync_tables()
 
-    entities = [
-        EntityConfig(
-            name="vin_disease",
-            api_name="vin_diseases",
-            filtered=False,
-            description="Test entity",
-        )
-    ]
+        entities = [
+            EntityConfig(
+                name="vin_disease",
+                api_name="vin_diseases",
+                filtered=False,
+                description="Test entity",
+            )
+        ]
 
-    await initialize_tables(None, entities, mock_client, db_manager)
+        await initialize_tables(None, entities, mock_client, db_manager)
 
-    # Check printed output
-    captured = capsys.readouterr()
-    assert "Loading option set configuration from config/optionsets.json" in captured.out
-    assert "Loaded config for 1 entities, 2 option set fields" in captured.out
-
-    db_manager.close()
+        # Check printed output
+        captured = capsys.readouterr()
+        assert "Loading option set configuration from config/optionsets.json" in captured.out
+        assert "Loaded config for 1 entities, 2 option set fields" in captured.out
 
 
 @pytest.mark.asyncio
@@ -274,25 +262,22 @@ async def test_no_config_shows_warning_message(mock_metadata_xml, temp_db, temp_
     mock_client = AsyncMock()
     mock_client.get_metadata = AsyncMock(return_value=mock_metadata_xml)
 
-    db_manager = DatabaseManager(temp_db)
-    db_manager.connect()
-    db_manager.init_sync_tables()
+    with DatabaseManager(temp_db) as db_manager:
+        db_manager.init_sync_tables()
 
-    entities = [
-        EntityConfig(
-            name="vin_disease",
-            api_name="vin_diseases",
-            filtered=False,
-            description="Test entity",
-        )
-    ]
+        entities = [
+            EntityConfig(
+                name="vin_disease",
+                api_name="vin_diseases",
+                filtered=False,
+                description="Test entity",
+            )
+        ]
 
-    await initialize_tables(None, entities, mock_client, db_manager)
+        await initialize_tables(None, entities, mock_client, db_manager)
 
-    # Check printed output
-    captured = capsys.readouterr()
-    assert "No option set config found" in captured.out
-    assert "tables will use TEXT for option sets" in captured.out
-    assert "python generate_optionset_config.py" in captured.out
-
-    db_manager.close()
+        # Check printed output
+        captured = capsys.readouterr()
+        assert "No option set config found" in captured.out
+        assert "tables will use TEXT for option sets" in captured.out
+        assert "python generate_optionset_config.py" in captured.out

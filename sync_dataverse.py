@@ -208,7 +208,6 @@ def _verify_references_if_needed(verify_references, db_manager, relationship_gra
 
         # Exit with error if issues found
         if report.issues:
-            db_manager.close()
             sys.exit(1)
 
 
@@ -285,7 +284,6 @@ async def run_sync_workflow(client, config, entities, db_manager, verify_referen
     # Report and verify
     _report_failures(failed_entities)
     _verify_references_if_needed(verify_references, db_manager, relationship_graph)
-    db_manager.close()
 
     # Summary
     _print_summary(total_added, total_updated)
@@ -315,8 +313,8 @@ async def main(verify_references=False):
 
         # [3-8] Run sync workflow
         async with DataverseClient(config, token) as client:
-            db_manager = DatabaseManager(config.sqlite_db_path)
-            await run_sync_workflow(client, config, entities, db_manager, verify_references)
+            with DatabaseManager(config.sqlite_db_path) as db_manager:
+                await run_sync_workflow(client, config, entities, db_manager, verify_references)
 
         sys.exit(0)
 

@@ -13,8 +13,49 @@ class TestDatabaseManager:
         """Create temp database."""
         db_path = tmp_path / "test.db"
         self.db = DatabaseManager(str(db_path))
+        self.db_path = str(db_path)
         yield
         self.db.close()
+
+    def test_context_manager_connect_and_close(self):
+        """Test context manager properly connects and closes connection."""
+        db_path = self.db_path
+
+        # Verify connection is established on entry
+        with DatabaseManager(db_path) as db:
+            assert db.conn is not None
+            # Create a table to verify connection works
+            db.execute("CREATE TABLE test (id INTEGER PRIMARY KEY)")
+            assert db.table_exists("test") is True
+
+        # Verify connection is closed on exit
+        # Create new instance to check the db is accessible (not locked)
+        db2 = DatabaseManager(db_path)
+        db2.connect()
+        assert db2.table_exists("test") is True
+        db2.close()
+
+    def test_context_manager_with_exception(self):
+        """Test context manager closes connection even when exception occurs."""
+        db_path = self.db_path
+
+        def _raise_test_error():
+            msg = "Test error"
+            raise ValueError(msg)
+
+        try:
+            with DatabaseManager(db_path) as db:
+                db.execute("CREATE TABLE test (id INTEGER PRIMARY KEY)")
+                # Simulate an error
+                _raise_test_error()
+        except ValueError:
+            pass
+
+        # Verify connection was still closed despite exception
+        db2 = DatabaseManager(db_path)
+        db2.connect()
+        assert db2.table_exists("test") is True
+        db2.close()
 
     def test_init_sync_tables(self):
         """Test sync tables creation."""

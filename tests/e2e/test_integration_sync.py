@@ -84,9 +84,8 @@ class TestE2ESync:
         )
 
         # Suppress print statements for cleaner test output
-        with patch("builtins.print"):
-            # Call REAL sync workflow (this is the key difference!)
-            db_manager = DatabaseManager(temp_db)
+        # Call REAL sync workflow (this is the key difference!)
+        with patch("builtins.print"), DatabaseManager(temp_db) as db_manager:
             await run_sync_workflow(
                 fake_client,
                 test_config,
@@ -189,8 +188,7 @@ class TestE2ESync:
             ],
         )
 
-        with patch("builtins.print"):
-            db_manager = DatabaseManager(temp_db)
+        with patch("builtins.print"), DatabaseManager(temp_db) as db_manager:
             await run_sync_workflow(fake_client, test_config, test_entities, db_manager)
 
         # Verify initial state
@@ -217,8 +215,7 @@ class TestE2ESync:
             ],
         )
 
-        with patch("builtins.print"):
-            db_manager2 = DatabaseManager(temp_db)
+        with patch("builtins.print"), DatabaseManager(temp_db) as db_manager2:
             await run_sync_workflow(fake_client2, test_config, test_entities, db_manager2)
 
         # Verify update (proves upsert_batch() ran correctly with SCD2)
@@ -338,8 +335,7 @@ class TestE2ESync:
             ],
         )
 
-        with patch("builtins.print"):
-            db_manager = DatabaseManager(temp_db)
+        with patch("builtins.print"), DatabaseManager(temp_db) as db_manager:
             await run_sync_workflow(fake_client, test_config, test_entities, db_manager)
 
         # Verify FilteredSyncManager transitive closure worked
@@ -382,8 +378,7 @@ class TestE2ESync:
         fake_client.set_metadata_response(mock_metadata_xml)
         fake_client.set_entity_response("accounts", [])  # No records
 
-        with patch("builtins.print"):
-            db_manager = DatabaseManager(temp_db)
+        with patch("builtins.print"), DatabaseManager(temp_db) as db_manager:
             await run_sync_workflow(fake_client, test_config, test_entities, db_manager)
 
         # Verify table created but empty
@@ -433,8 +428,7 @@ class TestE2ESync:
             ],
         )
 
-        with patch("builtins.print"):
-            db_manager = DatabaseManager(temp_db)
+        with patch("builtins.print"), DatabaseManager(temp_db) as db_manager:
             await run_sync_workflow(fake_client, test_config, test_entities, db_manager)
 
         # Verify results
@@ -517,8 +511,7 @@ class TestE2ESync:
             ],
         )
 
-        with patch("builtins.print"):
-            db_manager2 = DatabaseManager(temp_db)
+        with patch("builtins.print"), DatabaseManager(temp_db) as db_manager2:
             await run_sync_workflow(fake_client2, test_config, test_entities, db_manager2)
 
         # Verify junction records were updated correctly (active records only)

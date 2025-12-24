@@ -20,7 +20,7 @@ class SCD2Result:
     business_key_value: str  # The business key value (e.g., accountid)
 
 
-class DatabaseManager:
+class DatabaseManager:  # noqa: PLR0904 - Complex data manager with many methods for different operations
     """Manages SQLite database operations for sync."""
 
     def __init__(self, db_path: str):
@@ -37,6 +37,17 @@ class DatabaseManager:
         if self.conn:
             self.conn.close()
             self.conn = None
+
+    def __enter__(self):
+        """Context manager entry - establish connection."""
+        if not self.conn:
+            self.connect()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit - close connection."""
+        self.close()
+        return False
 
     def execute(self, sql: str, params: Optional[tuple] = None) -> sqlite3.Cursor:
         """Execute SQL statement."""

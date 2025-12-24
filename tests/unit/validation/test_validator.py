@@ -39,21 +39,19 @@ class TestValidator:
         mock_client.get_metadata = AsyncMock(return_value=mock_metadata_xml)
 
         # Setup database manager
-        db_manager = DatabaseManager(temp_db)
-        db_manager.init_sync_tables()
+        with DatabaseManager(temp_db) as db_manager:
+            db_manager.init_sync_tables()
 
-        # Run validation
-        valid_entities, entities_to_create, _diffs = await validate_schema_before_sync(
-            test_config,
-            [test_entity],
-            mock_client,
-            db_manager,
-        )
+            # Run validation
+            valid_entities, entities_to_create, _diffs = await validate_schema_before_sync(
+                test_config,
+                [test_entity],
+                mock_client,
+                db_manager,
+            )
 
-        # Verify results
-        assert len(valid_entities) == 1
-        assert valid_entities[0].name == "account"
-        assert len(entities_to_create) == 1
-        assert entities_to_create[0].name == "account"
-
-        db_manager.close()
+            # Verify results
+            assert len(valid_entities) == 1
+            assert valid_entities[0].name == "account"
+            assert len(entities_to_create) == 1
+            assert entities_to_create[0].name == "account"

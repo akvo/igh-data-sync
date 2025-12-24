@@ -2,13 +2,24 @@
 """Generate option set configuration from synced database.
 
 Usage:
-    python generate_optionset_config.py > config/optionsets.json
+    python generate_optionset_config.py [--db PATH] > config/optionsets.json
+
+Arguments:
+    --db PATH    Path to SQLite database (default: dataverse_complete.db)
 
 This script analyzes the SQLite database to find all option set lookup tables
 (_optionset_*) and maps them back to entity fields, generating a configuration
 file for future syncs.
+
+Examples:
+    # Use default database path
+    python generate_optionset_config.py > config/optionsets.json
+
+    # Use custom database path
+    python generate_optionset_config.py --db /path/to/my.db > config/optionsets.json
 """
 
+import argparse
 import json
 import sqlite3
 import sys
@@ -109,14 +120,33 @@ def extract_option_sets(db_path: str) -> dict[str, list[str]]:
 
 
 def main():
-    db_path = "dataverse_complete.db"
+    parser = argparse.ArgumentParser(
+        description="Generate option set configuration from synced database",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Use default database path
+  python generate_optionset_config.py > config/optionsets.json
+
+  # Use custom database path
+  python generate_optionset_config.py --db /path/to/my.db > config/optionsets.json
+        """,
+    )
+    parser.add_argument(
+        "--db",
+        default="dataverse_complete.db",
+        help="Path to SQLite database (default: dataverse_complete.db)",
+    )
+    args = parser.parse_args()
+
+    db_path = args.db
 
     if not Path(db_path).exists():
         print(f"❌ Database not found: {db_path}", file=sys.stderr)
         print("   Run sync_dataverse.py first to create the database", file=sys.stderr)
         sys.exit(1)
 
-    print("Analyzing database...", file=sys.stderr)
+    print(f"Analyzing database: {db_path}", file=sys.stderr)
     option_sets = extract_option_sets(db_path)
 
     print(f"\n✓ Generated config for {len(option_sets)} entities", file=sys.stderr)
@@ -124,8 +154,12 @@ def main():
     print(f"  Total option set fields: {total_fields}", file=sys.stderr)
     print("\nSave output to config/optionsets.json, then re-sync from scratch:", file=sys.stderr)
     print("  mkdir -p config", file=sys.stderr)
-    print("  python generate_optionset_config.py > config/optionsets.json", file=sys.stderr)
-    print("  rm dataverse_complete.db", file=sys.stderr)
+    if db_path != "dataverse_complete.db":
+        print(f"  python generate_optionset_config.py --db {db_path} > config/optionsets.json", file=sys.stderr)
+        print(f"  rm {db_path}", file=sys.stderr)
+    else:
+        print("  python generate_optionset_config.py > config/optionsets.json", file=sys.stderr)
+        print("  rm dataverse_complete.db", file=sys.stderr)
     print("  python sync_dataverse.py", file=sys.stderr)
     print("", file=sys.stderr)
 

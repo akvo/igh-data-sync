@@ -2,21 +2,26 @@
 """Generate option set configuration from synced database.
 
 Usage:
-    python generate_optionset_config.py [--db PATH] > config/optionsets.json
+    python -m igh_data_sync.scripts.optionset [--db PATH] [--entities-config PATH] [--env-file PATH]
 
 Arguments:
-    --db PATH    Path to SQLite database (default: dataverse_complete.db)
+    --db PATH                 Path to SQLite database (default: dataverse_complete.db)
+    --entities-config PATH    Path to entities config file (default: package data/entities_config.json)
+    --env-file PATH          Path to .env file (for consistency)
 
 This script analyzes the SQLite database to find all option set lookup tables
 (_optionset_*) and maps them back to entity fields, generating a configuration
 file for future syncs.
 
 Examples:
-    # Use default database path
-    python generate_optionset_config.py > config/optionsets.json
+    # Use default paths
+    python -m igh_data_sync.scripts.optionset > config/optionsets.json
 
     # Use custom database path
-    python generate_optionset_config.py --db /path/to/my.db > config/optionsets.json
+    python -m igh_data_sync.scripts.optionset --db /path/to/my.db > config/optionsets.json
+
+    # Use custom config path
+    python -m igh_data_sync.scripts.optionset --entities-config /path/to/entities_config.json > config/optionsets.json
 """
 
 import argparse
@@ -24,22 +29,30 @@ import json
 import sqlite3
 import sys
 from pathlib import Path
+from typing import Optional
+
+from igh_data_sync.config import get_default_config_path
 
 
-def extract_option_sets(db_path: str) -> dict[str, list[str]]:
+def extract_option_sets(db_path: str, entities_config_path: Optional[str] = None) -> dict[str, list[str]]:
     """
     Extract option set fields from database.
 
     Args:
         db_path: Path to SQLite database
+        entities_config_path: Optional path to entities configuration file.
+                              If None, uses package default
 
     Returns:
         Dict mapping entity name to list of option set field names
     """
     # Load entity config to get correct singular names
-    config_path = Path("entities_config.json")
+    if entities_config_path is None:
+        entities_config_path = get_default_config_path("entities_config.json")
+
+    config_path = Path(entities_config_path)
     if not config_path.exists():
-        print("❌ entities_config.json not found", file=sys.stderr)
+        print(f"❌ entities_config.json not found at {entities_config_path}", file=sys.stderr)
         sys.exit(1)
 
     with Path(config_path).open(encoding="utf-8") as f:
@@ -125,17 +138,30 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Use default database path
-  python generate_optionset_config.py > config/optionsets.json
+  # Use default paths
+  python -m igh_data_sync.scripts.optionset > config/optionsets.json
 
   # Use custom database path
-  python generate_optionset_config.py --db /path/to/my.db > config/optionsets.json
+  python -m igh_data_sync.scripts.optionset --db /path/to/my.db > config/optionsets.json
+
+  # Use custom config path
+  python -m igh_data_sync.scripts.optionset --entities-config /path/to/entities_config.json > config/optionsets.json
         """,
     )
     parser.add_argument(
         "--db",
         default="dataverse_complete.db",
         help="Path to SQLite database (default: dataverse_complete.db)",
+    )
+    parser.add_argument(
+        "--entities-config",
+        default=None,
+        help="Path to entities configuration file (default: package data/entities_config.json)",
+    )
+    parser.add_argument(
+        "--env-file",
+        default=None,
+        help="Path to .env file (for consistency, though not used in this script)",
     )
     args = parser.parse_args()
 
@@ -147,7 +173,7 @@ Examples:
         sys.exit(1)
 
     print(f"Analyzing database: {db_path}", file=sys.stderr)
-    option_sets = extract_option_sets(db_path)
+    option_sets = extract_option_sets(db_path, entities_config_path=args.entities_config)
 
     print(f"\n✓ Generated config for {len(option_sets)} entities", file=sys.stderr)
     total_fields = sum(len(fields) for fields in option_sets.values())
@@ -155,12 +181,12 @@ Examples:
     print("\nSave output to config/optionsets.json, then re-sync from scratch:", file=sys.stderr)
     print("  mkdir -p config", file=sys.stderr)
     if db_path != "dataverse_complete.db":
-        print(f"  python generate_optionset_config.py --db {db_path} > config/optionsets.json", file=sys.stderr)
+        print(f"  python -m igh_data_sync.scripts.optionset --db {db_path} > config/optionsets.json", file=sys.stderr)
         print(f"  rm {db_path}", file=sys.stderr)
     else:
-        print("  python generate_optionset_config.py > config/optionsets.json", file=sys.stderr)
+        print("  python -m igh_data_sync.scripts.optionset > config/optionsets.json", file=sys.stderr)
         print("  rm dataverse_complete.db", file=sys.stderr)
-    print("  python sync_dataverse.py", file=sys.stderr)
+    print("  python -m igh_data_sync.scripts.sync", file=sys.stderr)
     print("", file=sys.stderr)
 
     # Output JSON to stdout

@@ -6,7 +6,7 @@ from unittest.mock import patch
 import pytest
 import responses
 
-from lib.auth import DataverseAuth
+from igh_data_sync.auth import DataverseAuth
 
 
 @pytest.fixture

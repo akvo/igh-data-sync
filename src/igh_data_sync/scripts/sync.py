@@ -20,28 +20,28 @@ import asyncio
 import sys
 import traceback
 
-from lib.auth import DataverseAuth
-from lib.config import load_config, load_entity_configs
-from lib.dataverse_client import DataverseClient
-from lib.sync.database import DatabaseManager
-from lib.sync.entity_sync import sync_entity
-from lib.sync.filtered_sync import FilteredSyncManager
-from lib.sync.reference_verifier import ReferenceVerifier
-from lib.sync.relationship_graph import RelationshipGraph
-from lib.sync.schema_initializer import initialize_tables
-from lib.sync.sync_state import SyncStateManager
-from lib.validation.dataverse_schema import DataverseSchemaFetcher
-from lib.validation.validator import validate_schema_before_sync
+from igh_data_sync.auth import DataverseAuth
+from igh_data_sync.config import load_config, load_entity_configs
+from igh_data_sync.dataverse_client import DataverseClient
+from igh_data_sync.sync.database import DatabaseManager
+from igh_data_sync.sync.entity_sync import sync_entity
+from igh_data_sync.sync.filtered_sync import FilteredSyncManager
+from igh_data_sync.sync.reference_verifier import ReferenceVerifier
+from igh_data_sync.sync.relationship_graph import RelationshipGraph
+from igh_data_sync.sync.schema_initializer import initialize_tables
+from igh_data_sync.sync.sync_state import SyncStateManager
+from igh_data_sync.validation.dataverse_schema import DataverseSchemaFetcher
+from igh_data_sync.validation.validator import validate_schema_before_sync
 
 # Maximum length of error message to display in failure report
 MAX_ERROR_MESSAGE_LENGTH = 100
 
 
-def _load_configuration():
+def _load_configuration(env_file=None, entities_config=None):
     """Load configuration and entity configs."""
     print("\n[1/7] Loading configuration...")
-    config = load_config()
-    entities = load_entity_configs()
+    config = load_config(env_file=env_file)
+    entities = load_entity_configs(path=entities_config)
     print(f"  ✓ Loaded config for {len(entities)} entities")
     print(f"  ✓ Database: {config.sqlite_db_path}")
     return config, entities
@@ -289,7 +289,7 @@ async def run_sync_workflow(client, config, entities, db_manager, verify_referen
     _print_summary(total_added, total_updated)
 
 
-async def main(verify_references=False):
+async def main(verify_references=False, env_file=None, entities_config=None, optionsets_config=None):
     """
     Main entry point - thin shell for configuration and authentication.
 
@@ -301,6 +301,9 @@ async def main(verify_references=False):
 
     Args:
         verify_references: If True, verify reference integrity after sync
+        env_file: Path to .env file (default: .env in working dir or system env vars)
+        entities_config: Path to entities config file (default: package data)
+        optionsets_config: Path to optionsets config file (default: package data)
     """
     print("=" * 60)
     print("DATAVERSE TO SQLITE SYNC")
@@ -308,7 +311,7 @@ async def main(verify_references=False):
 
     try:
         # [1-2] Load config and authenticate
-        config, entities = _load_configuration()
+        config, entities = _load_configuration(env_file=env_file, entities_config=entities_config)
         token = _authenticate(config)
 
         # [3-8] Run sync workflow
@@ -332,8 +335,27 @@ if __name__ == "__main__":
     parser.add_argument(
         "--verify",
         action="store_true",
-        help=("Verify reference integrity after sync (exits with error if dangling references found)"),
+        help="Verify reference integrity after sync (exits with error if dangling references found)",
+    )
+    parser.add_argument(
+        "--entities-config",
+        help="Path to entities config file (default: package data)",
+    )
+    parser.add_argument(
+        "--optionsets-config",
+        help="Path to optionsets config file (default: package data)",
+    )
+    parser.add_argument(
+        "--env-file",
+        help="Path to .env file (default: .env in working dir or system env vars)",
     )
     args = parser.parse_args()
 
-    asyncio.run(main(verify_references=args.verify))
+    asyncio.run(
+        main(
+            verify_references=args.verify,
+            env_file=args.env_file,
+            entities_config=args.entities_config,
+            optionsets_config=args.optionsets_config,
+        )
+    )

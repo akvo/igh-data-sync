@@ -2,7 +2,7 @@
 
 import pytest
 
-from lib.sync.database import DatabaseManager
+from igh_data_sync.sync.database import DatabaseManager
 
 
 class TestDatabaseOptionSetDetection:
@@ -56,7 +56,7 @@ class TestDatabaseOptionSetDetection:
 
     def test_populate_detected_option_sets_single_select(self):
         """Test populating single-select option set."""
-        from lib.sync.optionset_detector import DetectedOptionSet  # noqa: PLC0415
+        from igh_data_sync.sync.optionset_detector import DetectedOptionSet  # noqa: PLC0415
 
         # Create entity table
         self.db.execute("CREATE TABLE accounts (accountid TEXT PRIMARY KEY, statuscode INTEGER)")
@@ -84,7 +84,7 @@ class TestDatabaseOptionSetDetection:
 
     def test_populate_detected_option_sets_multi_select(self):
         """Test populating multi-select option set."""
-        from lib.sync.optionset_detector import DetectedOptionSet  # noqa: PLC0415
+        from igh_data_sync.sync.optionset_detector import DetectedOptionSet  # noqa: PLC0415
 
         # Create entity table
         self.db.execute("CREATE TABLE accounts (accountid TEXT PRIMARY KEY)")

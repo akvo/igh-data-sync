@@ -2,7 +2,7 @@
 
 import pytest
 
-from lib.sync.database import DatabaseManager
+from igh_data_sync.sync.database import DatabaseManager
 
 
 class TestDatabaseManager:
@@ -322,7 +322,7 @@ class TestJunctionTableSCD2:
 
     def test_junction_snapshot_on_new_entity(self):
         """Test junction records created with valid_to = NULL for new entity."""
-        from lib.sync.database import SCD2Result  # noqa: PLC0415
+        from igh_data_sync.sync.database import SCD2Result  # noqa: PLC0415
 
         # Snapshot for new entity
         scd2_result = SCD2Result(
@@ -398,7 +398,7 @@ class TestJunctionTableSCD2:
 
     def test_junction_no_snapshot_when_entity_unchanged(self):
         """Test no junction snapshot when parent entity version_created = False."""
-        from lib.sync.database import SCD2Result  # noqa: PLC0415
+        from igh_data_sync.sync.database import SCD2Result  # noqa: PLC0415
 
         # Initial snapshot
         scd2_result1 = SCD2Result(
@@ -409,7 +409,7 @@ class TestJunctionTableSCD2:
         )
 
         # Simulate populate_detected_option_sets with version_created=True
-        from lib.sync.optionset_detector import DetectedOptionSet  # noqa: PLC0415
+        from igh_data_sync.sync.optionset_detector import DetectedOptionSet  # noqa: PLC0415
 
         detected = {
             "categories": DetectedOptionSet(

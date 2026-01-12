@@ -1,6 +1,6 @@
 """Tests for type mapping and data structures."""
 
-from lib.type_mapping import (
+from igh_data_sync.type_mapping import (
     ColumnMetadata,
     ForeignKeyMetadata,
     map_edm_to_db_type,

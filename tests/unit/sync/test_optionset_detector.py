@@ -1,6 +1,6 @@
 """Tests for option set detector."""
 
-from lib.sync.optionset_detector import OptionSetDetector
+from igh_data_sync.sync.optionset_detector import OptionSetDetector
 
 
 class TestOptionSetDetector:

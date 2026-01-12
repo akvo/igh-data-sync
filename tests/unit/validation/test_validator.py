@@ -4,10 +4,10 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from lib.config import EntityConfig
-from lib.dataverse_client import DataverseClient
-from lib.sync.database import DatabaseManager
-from lib.validation.validator import validate_schema_before_sync
+from igh_data_sync.config import EntityConfig
+from igh_data_sync.dataverse_client import DataverseClient
+from igh_data_sync.sync.database import DatabaseManager
+from igh_data_sync.validation.validator import validate_schema_before_sync
 
 
 @pytest.fixture

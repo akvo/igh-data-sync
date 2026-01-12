@@ -1,6 +1,6 @@
 """Tests for option set type mapping override."""
 
-from lib.type_mapping import map_edm_to_db_type
+from igh_data_sync.type_mapping import map_edm_to_db_type
 
 
 def test_option_set_overrides_edm_string_to_integer():

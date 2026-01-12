@@ -5,9 +5,9 @@ from unittest.mock import patch
 
 import pytest
 
-from lib.config import EntityConfig
-from lib.sync.database import DatabaseManager
-from sync_dataverse import run_sync_workflow
+from igh_data_sync.config import EntityConfig
+from igh_data_sync.scripts.sync import run_sync_workflow
+from igh_data_sync.sync.database import DatabaseManager
 from tests.helpers.fake_dataverse_client import FakeDataverseClient
 
 

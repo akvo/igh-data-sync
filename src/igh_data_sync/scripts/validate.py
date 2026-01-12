@@ -6,7 +6,7 @@ Validates that the local database schema matches the Dataverse entity schemas
 by comparing against the authoritative $metadata XML.
 
 Usage:
-    python validate_schema.py [--db-type sqlite|postgresql]
+    python -m igh_data_sync.scripts.validate [--db-type sqlite|postgresql]
 
 Exit codes:
     0 - Validation passed (no errors)
@@ -18,13 +18,13 @@ import asyncio
 import sys
 import traceback
 
-from lib.auth import DataverseAuth
-from lib.config import load_config, load_entities
-from lib.dataverse_client import DataverseClient
-from lib.validation.database_schema import DatabaseSchemaQuery
-from lib.validation.dataverse_schema import DataverseSchemaFetcher
-from lib.validation.report_generator import ReportGenerator
-from lib.validation.schema_comparer import SchemaComparer
+from igh_data_sync.auth import DataverseAuth
+from igh_data_sync.config import load_config, load_entities
+from igh_data_sync.dataverse_client import DataverseClient
+from igh_data_sync.validation.database_schema import DatabaseSchemaQuery
+from igh_data_sync.validation.dataverse_schema import DataverseSchemaFetcher
+from igh_data_sync.validation.report_generator import ReportGenerator
+from igh_data_sync.validation.schema_comparer import SchemaComparer
 
 
 async def main():
@@ -46,6 +46,16 @@ async def main():
         default="schema_validation_report.md",
         help="Path for Markdown report (default: schema_validation_report.md)",
     )
+    parser.add_argument(
+        "--entities-config",
+        default="entities_config.json",
+        help="Path to entities config file (default: entities_config.json)",
+    )
+    parser.add_argument(
+        "--env-file",
+        default=".env",
+        help="Path to .env file (default: .env)",
+    )
     args = parser.parse_args()
 
     print("=" * 60)
@@ -55,8 +65,8 @@ async def main():
     try:
         # [1/6] Load Configuration
         print("\n[1/6] Loading configuration...")
-        config = load_config()
-        entities = load_entities("entities_config.json")
+        config = load_config(env_path=args.env_file)
+        entities = load_entities(path=args.entities_config)
         print("✓ Loaded configuration")
         print(f"  - API URL: {config.api_url}")
         print(f"  - Entities to check: {len(entities)}")

@@ -3,7 +3,7 @@
 import pytest
 from aioresponses import aioresponses
 
-from lib.dataverse_client import DataverseClient
+from igh_data_sync.dataverse_client import DataverseClient
 
 
 class TestDataverseClient:

@@ -4,6 +4,13 @@ import json
 import os
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Optional
+
+try:
+    from importlib.resources import files
+except ImportError:
+    # Python <3.9 fallback
+    from importlib_resources import files  # type: ignore
 
 from dotenv import load_dotenv
 
@@ -42,12 +49,30 @@ class EntityConfig:
     description: str
 
 
-def load_config(env_path: str = ".env") -> Config:
+def get_default_config_path(filename: str) -> str:
     """
-    Load configuration from .env file.
+    Get default config file path from package data.
 
     Args:
-        env_path: Path to .env file (default: '.env')
+        filename: Name of the config file (e.g., 'entities_config.json')
+
+    Returns:
+        Absolute path to the config file in package data directory
+    """
+    return str(files("igh_data_sync").joinpath(f"data/{filename}"))
+
+
+def load_config(env_file: Optional[str] = None) -> Config:
+    """
+    Load configuration from environment variables.
+
+    Environment variable loading precedence:
+    1. If env_file provided via CLI, load from that path
+    2. Otherwise, check for .env in current working directory
+    3. Otherwise, use system environment variables
+
+    Args:
+        env_file: Optional path to .env file (CLI parameter)
 
     Returns:
         Config object with loaded settings
@@ -55,7 +80,14 @@ def load_config(env_path: str = ".env") -> Config:
     Raises:
         ValueError: If required configuration is missing
     """
-    load_dotenv(env_path)
+    # Load environment variables with proper precedence
+    if env_file:
+        # Explicit path provided via CLI
+        load_dotenv(env_file)
+    elif Path(".env").exists():
+        # .env in working directory
+        load_dotenv(".env")
+    # Otherwise, use system environment variables (no action needed)
 
     # Required fields
     api_url = os.getenv("DATAVERSE_API_URL")
@@ -91,12 +123,13 @@ def load_config(env_path: str = ".env") -> Config:
     )
 
 
-def load_entities(path: str = "entities_config.json") -> list[str]:
+def load_entities(path: Optional[str] = None) -> list[str]:
     """
     Load entity names from entities_config.json.
 
     Args:
-        path: Path to entities configuration file
+        path: Optional path to entities configuration file.
+              If None, uses package default from data/entities_config.json
 
     Returns:
         List of entity names (logical names, singular form)
@@ -105,6 +138,10 @@ def load_entities(path: str = "entities_config.json") -> list[str]:
         FileNotFoundError: If config file doesn't exist
         ValueError: If config file is invalid
     """
+    # Use package default if no path provided
+    if path is None:
+        path = get_default_config_path("entities_config.json")
+
     config_path = Path(path)
 
     if not config_path.exists():
@@ -133,7 +170,7 @@ def load_entities(path: str = "entities_config.json") -> list[str]:
     return entity_names
 
 
-def load_entity_configs(path: str = "entities_config.json") -> list[EntityConfig]:
+def load_entity_configs(path: Optional[str] = None) -> list[EntityConfig]:
     """
     Load full entity configurations from entities_config.json.
 
@@ -141,7 +178,8 @@ def load_entity_configs(path: str = "entities_config.json") -> list[EntityConfig
     Pluralization: simply adds 's' to the end (e.g., vin_candidate → vin_candidates)
 
     Args:
-        path: Path to entities configuration file
+        path: Optional path to entities configuration file.
+              If None, uses package default from data/entities_config.json
 
     Returns:
         List of EntityConfig objects with both name (singular) and api_name (plural)
@@ -150,6 +188,10 @@ def load_entity_configs(path: str = "entities_config.json") -> list[EntityConfig
         FileNotFoundError: If config file doesn't exist
         ValueError: If config file is invalid
     """
+    # Use package default if no path provided
+    if path is None:
+        path = get_default_config_path("entities_config.json")
+
     config_path = Path(path)
 
     if not config_path.exists():
@@ -190,3 +232,38 @@ def load_entity_configs(path: str = "entities_config.json") -> list[EntityConfig
         )
 
     return entity_configs
+
+
+def load_optionsets_config(path: Optional[str] = None) -> dict:
+    """
+    Load option set configuration from optionsets.json.
+
+    Args:
+        path: Optional path to optionsets configuration file.
+              If None, uses package default from data/optionsets.json
+
+    Returns:
+        Dict mapping entity names to lists of option set field names
+
+    Raises:
+        FileNotFoundError: If config file doesn't exist
+        ValueError: If config file is invalid
+    """
+    # Use package default if no path provided
+    if path is None:
+        path = get_default_config_path("optionsets.json")
+
+    config_path = Path(path)
+
+    if not config_path.exists():
+        msg = f"Option sets configuration file not found: {path}"
+        raise FileNotFoundError(msg)
+
+    with Path(config_path).open(encoding="utf-8") as f:
+        config = json.load(f)
+
+    if not isinstance(config, dict):
+        msg = "Invalid optionsets.json: must be a dictionary"
+        raise TypeError(msg)
+
+    return config

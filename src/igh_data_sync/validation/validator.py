@@ -5,18 +5,19 @@ Validates schema against Dataverse $metadata before syncing.
 """
 
 import sys
+from typing import Optional
 
-from lib.type_mapping import TableSchema
-from lib.validation.database_schema import DatabaseSchemaQuery
-from lib.validation.dataverse_schema import DataverseSchemaFetcher
-from lib.validation.schema_comparer import SchemaComparer
+from igh_data_sync.type_mapping import TableSchema
+from igh_data_sync.validation.database_schema import DatabaseSchemaQuery
+from igh_data_sync.validation.dataverse_schema import DataverseSchemaFetcher
+from igh_data_sync.validation.schema_comparer import SchemaComparer
 
 # System columns added by the sync tool (should be excluded from validation)
 SYSTEM_COLUMNS = {"row_id", "json_response", "sync_time", "valid_from", "valid_to"}
 
 
 def _filter_system_columns(
-    schema: TableSchema, expected_pk: str | None = None, singular_entity_name: str | None = None
+    schema: TableSchema, expected_pk: Optional[str] = None, singular_entity_name: Optional[str] = None
 ) -> TableSchema:
     """
     Filter out system columns from schema before comparison.

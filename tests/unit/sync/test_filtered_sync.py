@@ -2,9 +2,9 @@
 
 import pytest
 
-from lib.sync.database import DatabaseManager
-from lib.sync.filtered_sync import FilteredSyncManager
-from lib.sync.sync_state import SyncStateManager
+from igh_data_sync.sync.database import DatabaseManager
+from igh_data_sync.sync.filtered_sync import FilteredSyncManager
+from igh_data_sync.sync.sync_state import SyncStateManager
 
 
 class TestFilteredSyncManager:

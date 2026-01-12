@@ -2,7 +2,7 @@
 
 import json
 
-from lib.config import load_entity_configs
+from igh_data_sync.config import load_entity_configs
 
 
 class TestEntityConfig:

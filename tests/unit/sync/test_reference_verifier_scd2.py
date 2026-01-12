@@ -2,9 +2,9 @@
 
 import pytest
 
-from lib.sync.database import DatabaseManager
-from lib.sync.reference_verifier import ReferenceVerifier
-from lib.sync.relationship_graph import EntityRelationships, RelationshipGraph
+from igh_data_sync.sync.database import DatabaseManager
+from igh_data_sync.sync.reference_verifier import ReferenceVerifier
+from igh_data_sync.sync.relationship_graph import EntityRelationships, RelationshipGraph
 
 
 @pytest.fixture

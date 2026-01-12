@@ -2,7 +2,7 @@
 
 import pytest
 
-from lib.validation.metadata_parser import MetadataParser
+from igh_data_sync.validation.metadata_parser import MetadataParser
 
 # Sample $metadata XML for testing
 SAMPLE_METADATA_XML = """<?xml version="1.0" encoding="utf-8"?>

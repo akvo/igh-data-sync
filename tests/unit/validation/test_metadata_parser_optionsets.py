@@ -1,6 +1,6 @@
 """Tests for metadata parser with option set configuration."""
 
-from lib.validation.metadata_parser import MetadataParser
+from igh_data_sync.validation.metadata_parser import MetadataParser
 
 
 def test_parser_without_option_set_config():

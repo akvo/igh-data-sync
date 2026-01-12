@@ -7,9 +7,9 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from lib.config import EntityConfig
-from lib.sync.database import DatabaseManager
-from lib.sync.schema_initializer import initialize_tables
+from igh_data_sync.config import EntityConfig
+from igh_data_sync.sync.database import DatabaseManager
+from igh_data_sync.sync.schema_initializer import initialize_tables
 
 
 @pytest.fixture

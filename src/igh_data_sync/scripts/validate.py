@@ -36,7 +36,7 @@ async def async_main(db_type, json_report, md_report, entities_config, env_file)
     try:
         # [1/6] Load Configuration
         print("\n[1/6] Loading configuration...")
-        config = load_config(env_path=env_file)
+        config = load_config(env_file=env_file)
         entities = load_entities(path=entities_config)
         print("✓ Loaded configuration")
         print(f"  - API URL: {config.api_url}")
@@ -127,13 +127,13 @@ def main():
     )
     parser.add_argument(
         "--entities-config",
-        default="entities_config.json",
-        help="Path to entities config file (default: entities_config.json)",
+        default=None,
+        help="Path to entities config file (default: package data)",
     )
     parser.add_argument(
         "--env-file",
-        default=".env",
-        help="Path to .env file (default: .env)",
+        default=None,
+        help="Path to .env file (default: .env in working dir or system env vars)",
     )
     args = parser.parse_args()
 

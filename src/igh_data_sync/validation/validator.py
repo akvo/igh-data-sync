@@ -4,7 +4,6 @@ Schema validation functions for Dataverse sync.
 Validates schema against Dataverse $metadata before syncing.
 """
 
-import sys
 from typing import Optional
 
 from igh_data_sync.type_mapping import TableSchema
@@ -126,7 +125,7 @@ def _adjust_phantom_pk(dv_schema, db_schema_filtered, singular_name):
     return dv_schema
 
 
-async def validate_schema_before_sync(config, entities, client, _db_manager):
+async def validate_schema_before_sync(config, entities, client, _db_manager, logger=None):
     """
     Validate schema against Dataverse $metadata.
 
@@ -135,10 +134,17 @@ async def validate_schema_before_sync(config, entities, client, _db_manager):
         entities: List of EntityConfig objects to validate
         client: DataverseClient instance
         _db_manager: DatabaseManager instance (unused, kept for API compatibility)
+        logger: Optional logger for output
 
-    Returns: (valid_entities, entities_to_create, differences)
+    Returns: (valid_entities, entities_to_create, differences, validation_passed)
     """
-    print("  Fetching schemas from Dataverse $metadata...")
+    def _log(message):
+        if logger:
+            logger.info(message)
+        else:
+            print(message)
+
+    _log("  Fetching schemas from Dataverse $metadata...")
 
     fetcher = DataverseSchemaFetcher(client, target_db="sqlite")
     dv_schemas = await fetcher.fetch_schemas_from_metadata([e.name for e in entities])
@@ -159,33 +165,50 @@ async def validate_schema_before_sync(config, entities, client, _db_manager):
         if result["create"]:
             entities_to_create.append(entity)
 
-    _report_validation_results(differences)
-    return valid_entities, entities_to_create, differences
+    validation_passed = _report_validation_results(differences, logger)
+    return valid_entities, entities_to_create, differences, validation_passed
 
 
-def _report_validation_results(differences):
-    """Print validation results and exit if errors found."""
+def _report_validation_results(differences, logger=None):
+    """
+    Print validation results.
+
+    Args:
+        differences: List of schema differences
+        logger: Optional logger for output (if None, uses print)
+
+    Returns:
+        bool: True if validation passed (no errors), False if errors found
+    """
+    def _log(message):
+        if logger:
+            logger.info(message)
+        else:
+            print(message)
+
     errors = [d for d in differences if d["severity"] == "error"]
     warnings = [d for d in differences if d["severity"] == "warning"]
     infos = [d for d in differences if d["severity"] == "info"]
 
     if differences:
-        print("\n  Schema Validation Results:")
-        print(f"    Errors: {len(errors)}, Warnings: {len(warnings)}, Info: {len(infos)}\n")
+        _log("\n  Schema Validation Results:")
+        _log(f"    Errors: {len(errors)}, Warnings: {len(warnings)}, Info: {len(infos)}\n")
 
         for diff in errors:
-            print(f"    ❌ ERROR [{diff['entity']}]: {diff['description']}")
+            _log(f"    ❌ ERROR [{diff['entity']}]: {diff['description']}")
         for diff in warnings:
-            print(f"    ⚠️  WARNING [{diff['entity']}]: {diff['description']}")
+            _log(f"    ⚠️  WARNING [{diff['entity']}]: {diff['description']}")
         for diff in infos:
-            print(f"    ℹ️  INFO [{diff['entity']}]: {diff['description']}")  # noqa: RUF001 - info emoji for user-facing output
+            _log(f"    ℹ️  INFO [{diff['entity']}]: {diff['description']}")  # noqa: RUF001 - info emoji for user-facing output
 
-    # Exit if errors
+    # Return False if errors (don't exit)
     if errors:
-        print(f"\n❌ SYNC ABORTED: {len(errors)} breaking schema change(s)")
-        sys.exit(1)
+        _log(f"\n❌ SYNC ABORTED: {len(errors)} breaking schema change(s)")
+        return False
 
     if warnings or infos:
-        print(f"\n  ✓ Validation passed with {len(warnings)} warning(s), {len(infos)} info")
+        _log(f"\n  ✓ Validation passed with {len(warnings)} warning(s), {len(infos)} info")
     else:
-        print("\n  ✓ Validation passed (no changes)")
+        _log("\n  ✓ Validation passed (no changes)")
+
+    return True

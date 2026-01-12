@@ -17,11 +17,13 @@ Exit codes:
 
 import argparse
 import asyncio
+import logging
 import sys
 import traceback
+from typing import Optional
 
 from igh_data_sync.auth import DataverseAuth
-from igh_data_sync.config import load_config, load_entity_configs, load_optionsets_config
+from igh_data_sync.config import Config, EntityConfig, load_config, load_entity_configs, load_optionsets_config
 from igh_data_sync.dataverse_client import DataverseClient
 from igh_data_sync.sync.database import DatabaseManager
 from igh_data_sync.sync.entity_sync import sync_entity
@@ -37,56 +39,64 @@ from igh_data_sync.validation.validator import validate_schema_before_sync
 MAX_ERROR_MESSAGE_LENGTH = 100
 
 
-def _load_configuration(env_file=None, entities_config=None):
+def _log(message: str, logger: Optional[logging.Logger] = None):
+    """Log message using logger if provided, otherwise print."""
+    if logger:
+        logger.info(message)
+    else:
+        print(message)
+
+
+def _load_configuration(env_file=None, entities_config=None, logger=None):
     """Load configuration and entity configs."""
-    print("\n[1/7] Loading configuration...")
+    _log("\n[1/7] Loading configuration...", logger)
     config = load_config(env_file=env_file)
     entities = load_entity_configs(path=entities_config)
-    print(f"  ✓ Loaded config for {len(entities)} entities")
-    print(f"  ✓ Database: {config.sqlite_db_path}")
+    _log(f"  ✓ Loaded config for {len(entities)} entities", logger)
+    _log(f"  ✓ Database: {config.sqlite_db_path}", logger)
     return config, entities
 
 
-def _authenticate(config):
+def _authenticate(config, logger=None):
     """Authenticate with Dataverse."""
-    print("\n[2/7] Authenticating...")
+    _log("\n[2/7] Authenticating...", logger)
     auth = DataverseAuth(config)
     token = auth.get_token()
-    print(f"  ✓ Authenticated (tenant: {auth.tenant_id})")
+    _log(f"  ✓ Authenticated (tenant: {auth.tenant_id})", logger)
     return token
 
 
-async def _initialize_database(config, entities_to_create, client, db_manager, option_set_fields_by_entity=None):
+async def _initialize_database(config, entities_to_create, client, db_manager, option_set_fields_by_entity=None, logger=None):
     """Initialize database tables."""
-    print("\n[4/7] Initializing database...")
+    _log("\n[4/7] Initializing database...", logger)
     db_manager.init_sync_tables()
-    print("  ✓ Sync tables initialized")
+    _log("  ✓ Sync tables initialized", logger)
 
     if entities_to_create:
         await initialize_tables(config, entities_to_create, client, db_manager, option_set_fields_by_entity)
 
 
-async def _prepare_sync(client, valid_entities):
+async def _prepare_sync(client, valid_entities, logger=None):
     """Fetch schemas and build relationship graph."""
-    print("\n[5/7] Preparing for sync...")
+    _log("\n[5/7] Preparing for sync...", logger)
     fetcher = DataverseSchemaFetcher(client, target_db="sqlite")
     dv_schemas = await fetcher.fetch_schemas_from_metadata([e.name for e in valid_entities])
-    print(f"  ✓ Schemas loaded for {len(dv_schemas)} entities")
+    _log(f"  ✓ Schemas loaded for {len(dv_schemas)} entities", logger)
     return fetcher, dv_schemas
 
 
-async def _build_relationship_graph(fetcher, entities):
+async def _build_relationship_graph(fetcher, entities, logger=None):
     """Build relationship graph for filtered sync."""
-    print("\n[5.5/7] Building relationship graph...")
+    _log("\n[5.5/7] Building relationship graph...", logger)
     metadata_xml = await fetcher.fetch_metadata_xml()
     relationship_graph = RelationshipGraph.build_from_metadata(metadata_xml, entities)
-    print("  ✓ Relationship graph built")
+    _log("  ✓ Relationship graph built", logger)
     return relationship_graph
 
 
-async def _sync_unfiltered_entities(unfiltered, dv_schemas, client, db_manager, state_manager):
+async def _sync_unfiltered_entities(unfiltered, dv_schemas, client, db_manager, state_manager, logger=None):
     """Sync unfiltered entities."""
-    print(f"\n  Syncing {len(unfiltered)} unfiltered entities...")
+    _log(f"\n  Syncing {len(unfiltered)} unfiltered entities...", logger)
     total_added = 0
     total_updated = 0
     failed_entities = []
@@ -120,9 +130,10 @@ async def _sync_filtered_entities(
     db_manager,
     state_manager,
     relationship_graph,
+    logger=None,
 ):
     """Sync filtered entities using transitive closure."""
-    print(f"\n  Syncing {len(filtered)} filtered entities with transitive closure...")
+    _log(f"\n  Syncing {len(filtered)} filtered entities with transitive closure...", logger)
     sync_manager = FilteredSyncManager(client, db_manager, state_manager)
 
     # Track synced IDs to detect convergence
@@ -133,7 +144,7 @@ async def _sync_filtered_entities(
     failed_entities = []
 
     for iteration in range(1, max_iterations + 1):
-        print(f"\n  Transitive closure iteration {iteration}:")
+        _log(f"\n  Transitive closure iteration {iteration}:", logger)
 
         # Extract IDs based on current database state
         filtered_ids = FilteredSyncManager.extract_filtered_ids(
@@ -148,11 +159,11 @@ async def _sync_filtered_entities(
             new_ids = filtered_ids.get(entity.api_name, set()) - synced_ids[entity.api_name]
             if new_ids:
                 has_new_ids = True
-                print(f"    {entity.api_name}: {len(new_ids)} new IDs to sync")
+                _log(f"    {entity.api_name}: {len(new_ids)} new IDs to sync", logger)
 
         # If no new IDs, we've converged
         if not has_new_ids:
-            print("    Converged - no new IDs found")
+            _log("    Converged - no new IDs found", logger)
             break
 
         # Sync entities with new IDs
@@ -173,54 +184,60 @@ async def _sync_filtered_entities(
                 total_added += added
                 total_updated += updated
                 synced_ids[entity.api_name].update(new_ids)
-                print(f"    ✓ {entity.api_name}: {added} added, {updated} updated")
+                _log(f"    ✓ {entity.api_name}: {added} added, {updated} updated", logger)
             except Exception as e:
                 # Log error but continue syncing other entities
                 failed_entities.append((entity.api_name, str(e)))
-                print(f"    ❌ {entity.api_name}: Failed - {e}")
+                _log(f"    ❌ {entity.api_name}: Failed - {e}", logger)
                 continue
 
     # Log final statistics
-    print("\n  Filtered entity sync complete:")
+    _log("\n  Filtered entity sync complete:", logger)
     for entity in filtered:
         count = len(synced_ids[entity.api_name])
-        print(f"    {entity.api_name}: {count} total records synced")
+        _log(f"    {entity.api_name}: {count} total records synced", logger)
 
     return total_added, total_updated, failed_entities
 
 
-def _report_failures(failed_entities):
+def _report_failures(failed_entities, logger=None):
     """Report any sync failures."""
     if failed_entities:
-        print(f"\n⚠️  {len(failed_entities)} entity/entities failed to sync:")
+        _log(f"\n⚠️  {len(failed_entities)} entity/entities failed to sync:", logger)
         for entity_name, error in failed_entities:
             error_preview = error[:MAX_ERROR_MESSAGE_LENGTH] + "..." if len(error) > MAX_ERROR_MESSAGE_LENGTH else error
-            print(f"  - {entity_name}: {error_preview}")
+            _log(f"  - {entity_name}: {error_preview}", logger)
 
 
-def _verify_references_if_needed(verify_references, db_manager, relationship_graph):
-    """Verify reference integrity if requested."""
-    if verify_references:
-        print("\n[7/7] Verifying references...")
-        verifier = ReferenceVerifier()
-        report = verifier.verify_references(db_manager, relationship_graph)
-        print(report)
+def _verify_references(verify_references, db_manager, relationship_graph, logger=None):
+    """
+    Verify reference integrity if requested.
 
-        # Exit with error if issues found
-        if report.issues:
-            sys.exit(1)
+    Returns:
+        tuple: (has_issues, issues_list) where has_issues is bool and issues_list is list of issues
+    """
+    if not verify_references:
+        return False, []
+
+    _log("\n[7/7] Verifying references...", logger)
+    verifier = ReferenceVerifier()
+    report = verifier.verify_references(db_manager, relationship_graph)
+    _log(str(report), logger)
+
+    # Return issues instead of calling sys.exit()
+    return bool(report.issues), report.issues
 
 
-def _print_summary(total_added, total_updated):
+def _print_summary(total_added, total_updated, logger=None):
     """Print sync summary."""
-    print("\n[8/8] Sync complete!")
-    print("=" * 60)
-    print(f"Total records added: {total_added}")
-    print(f"Total records updated: {total_updated}")
-    print("=" * 60)
+    _log("\n[8/8] Sync complete!", logger)
+    _log("=" * 60, logger)
+    _log(f"Total records added: {total_added}", logger)
+    _log(f"Total records updated: {total_updated}", logger)
+    _log("=" * 60, logger)
 
 
-async def run_sync_workflow(client, config, entities, db_manager, verify_references=False, option_set_fields_by_entity=None):
+async def run_sync_workflow(client, config, entities, db_manager, verify_references=False, option_set_fields_by_entity=None, logger=None):
     """
     Core sync workflow - extracted for testability.
 
@@ -234,27 +251,57 @@ async def run_sync_workflow(client, config, entities, db_manager, verify_referen
         db_manager: DatabaseManager instance
         verify_references: If True, verify reference integrity after sync
         option_set_fields_by_entity: Optional dict mapping entity names to option set field names
+        logger: Optional logger for output (if None, uses print)
+
+    Returns:
+        dict: Sync results with keys:
+            - success (bool): True if sync completed without errors
+            - total_added (int): Number of records added
+            - total_updated (int): Number of records updated
+            - failed_entities (list): List of (entity_name, error_message) tuples
+            - validation_errors (list): List of validation errors if validation failed
+            - reference_errors (list): List of reference integrity issues if verify_references=True
     """
     # Validate schema
-    print("\n[3/7] Validating schema...")
-    valid_entities, entities_to_create, _diffs = await validate_schema_before_sync(
+    _log("\n[3/7] Validating schema...", logger)
+    valid_entities, entities_to_create, differences, validation_passed = await validate_schema_before_sync(
         config,
         entities,
         client,
         db_manager,
+        logger,
     )
 
+    # Check validation results
+    if not validation_passed:
+        validation_errors = [d for d in differences if d["severity"] == "error"]
+        return {
+            "success": False,
+            "total_added": 0,
+            "total_updated": 0,
+            "failed_entities": [],
+            "validation_errors": validation_errors,
+            "reference_errors": [],
+        }
+
     if not valid_entities:
-        print("\n❌ No valid entities to sync")
-        return
+        _log("\n❌ No valid entities to sync", logger)
+        return {
+            "success": False,
+            "total_added": 0,
+            "total_updated": 0,
+            "failed_entities": [],
+            "validation_errors": [],
+            "reference_errors": [],
+        }
 
     # Initialize database and prepare
-    await _initialize_database(config, entities_to_create, client, db_manager, option_set_fields_by_entity)
-    fetcher, dv_schemas = await _prepare_sync(client, valid_entities)
-    relationship_graph = await _build_relationship_graph(fetcher, entities)
+    await _initialize_database(config, entities_to_create, client, db_manager, option_set_fields_by_entity, logger)
+    fetcher, dv_schemas = await _prepare_sync(client, valid_entities, logger)
+    relationship_graph = await _build_relationship_graph(fetcher, entities, logger)
 
     # Sync entities
-    print("\n[6/7] Syncing data...")
+    _log("\n[6/7] Syncing data...", logger)
     state_manager = SyncStateManager(db_manager)
     unfiltered = [e for e in valid_entities if not e.filtered]
     filtered = [e for e in valid_entities if e.filtered]
@@ -266,6 +313,7 @@ async def run_sync_workflow(client, config, entities, db_manager, verify_referen
         client,
         db_manager,
         state_manager,
+        logger,
     )
 
     # Sync filtered
@@ -277,28 +325,160 @@ async def run_sync_workflow(client, config, entities, db_manager, verify_referen
             db_manager,
             state_manager,
             relationship_graph,
+            logger,
         )
         total_added += f_added
         total_updated += f_updated
         failed_entities.extend(f_failed)
 
     # Report and verify
-    _report_failures(failed_entities)
-    _verify_references_if_needed(verify_references, db_manager, relationship_graph)
+    _report_failures(failed_entities, logger)
+    has_reference_issues, reference_issues = _verify_references(verify_references, db_manager, relationship_graph, logger)
 
     # Summary
-    _print_summary(total_added, total_updated)
+    _print_summary(total_added, total_updated, logger)
+
+    # Determine overall success
+    success = len(failed_entities) == 0 and not has_reference_issues
+
+    return {
+        "success": success,
+        "total_added": total_added,
+        "total_updated": total_updated,
+        "failed_entities": failed_entities,
+        "validation_errors": [],
+        "reference_errors": reference_issues,
+    }
+
+
+async def run_sync(
+    config: Config,
+    entities_config: Optional[list[EntityConfig]] = None,
+    optionsets_config: Optional[dict] = None,
+    verify_reference: bool = False,
+    logger: Optional[logging.Logger] = None,
+) -> bool:
+    """
+    Programmatic async entry point for Dataverse sync.
+
+    Designed for use from Apache Airflow or other orchestration tools.
+    Handles authentication, database connection, and complete sync workflow.
+
+    Args:
+        config: Configuration object with Dataverse API credentials and database settings.
+                Required fields: api_url, client_id, client_secret, scope, sqlite_db_path
+        entities_config: List of EntityConfig objects to sync.
+                        If None, loads from default package data (entities_config.json)
+        optionsets_config: Dict mapping entity names to option set field lists.
+                          If None, loads from default package data (optionsets.json).
+                          Currently unused by core logic but included for future use.
+        verify_reference: If True, verify foreign key reference integrity after sync.
+                         Sync will fail (return False) if dangling references found.
+        logger: Optional Python logger for output. If None, runs silently.
+
+    Returns:
+        bool: True if sync completed successfully, False if any errors occurred
+              (validation failures, sync errors, or reference integrity issues)
+
+    Raises:
+        ValueError: If config is missing required fields
+        RuntimeError: If authentication fails
+
+    Example:
+        ```python
+        from igh_data_sync import run_sync
+        from igh_data_sync.config import Config
+        import logging
+
+        config = Config(
+            api_url="https://org.api.crm.dynamics.com/api/data/v9.2/",
+            client_id="...",
+            client_secret="...",
+            scope="...",
+            sqlite_db_path="dataverse.db"
+        )
+
+        logger = logging.getLogger(__name__)
+        success = await run_sync(config, verify_reference=True, logger=logger)
+
+        if not success:
+            raise Exception("Sync failed")
+        ```
+    """
+    # [1] Load entities config if not provided
+    if entities_config is None:
+        if logger:
+            logger.info("Loading entities from package defaults")
+        entities_config = load_entity_configs()  # Uses package data
+
+    # [2] Load optionsets config if not provided
+    if optionsets_config is None:
+        if logger:
+            logger.info("Loading optionsets from package defaults")
+        optionsets_config = load_optionsets_config()  # Uses package data
+
+    # [3] Authenticate with Dataverse
+    if logger:
+        logger.info("Authenticating with Dataverse")
+    try:
+        auth = DataverseAuth(config)
+        token = auth.get_token()
+    except Exception as e:
+        if logger:
+            logger.error(f"Authentication failed: {e}")
+        raise RuntimeError(f"Authentication failed: {e}") from e
+
+    # [4] Run sync workflow with context managers
+    if logger:
+        logger.info("Starting sync workflow")
+
+    try:
+        async with DataverseClient(config, token) as client:
+            with DatabaseManager(config.sqlite_db_path) as db_manager:
+                results = await run_sync_workflow(
+                    client=client,
+                    config=config,
+                    entities=entities_config,
+                    db_manager=db_manager,
+                    verify_references=verify_reference,
+                    option_set_fields_by_entity=optionsets_config,
+                    logger=logger,
+                )
+
+        # [5] Determine success from results
+        success = results["success"]
+
+        if logger:
+            if success:
+                logger.info(
+                    f"Sync completed successfully: "
+                    f"+{results['total_added']} added, "
+                    f"{results['total_updated']} updated"
+                )
+            else:
+                logger.error(
+                    f"Sync failed: "
+                    f"{len(results['failed_entities'])} entity failures, "
+                    f"{len(results.get('validation_errors', []))} validation errors, "
+                    f"{len(results.get('reference_errors', []))} reference errors"
+                )
+
+        return success
+
+    except Exception:
+        if logger:
+            logger.exception("Sync workflow failed with exception")
+        raise
 
 
 async def async_main(verify_references=False, env_file=None, entities_config=None, optionsets_config=None):
     """
-    Async main workflow - handles configuration and sync execution.
+    CLI entry point - wraps run_sync() with CLI-specific concerns.
 
-    This function handles:
-    - Loading configuration from environment
-    - OAuth authentication with Azure
-    - Creating DataverseClient with context manager
-    - Delegating to run_sync_workflow() for actual sync logic
+    Handles:
+    - Loading configuration from files/environment
+    - Setting up console output (print statements)
+    - Exit codes based on success/failure
 
     Args:
         verify_references: If True, verify reference integrity after sync
@@ -311,17 +491,47 @@ async def async_main(verify_references=False, env_file=None, entities_config=Non
     print("=" * 60)
 
     try:
-        # [1-2] Load config and authenticate
-        config, entities = _load_configuration(env_file=env_file, entities_config=entities_config)
-        option_set_fields = load_optionsets_config(path=optionsets_config)
-        token = _authenticate(config)
+        # [1] Load configuration
+        print("\n[1/2] Loading configuration...")
+        config = load_config(env_file=env_file)
 
-        # [3-8] Run sync workflow
-        async with DataverseClient(config, token) as client:
-            with DatabaseManager(config.sqlite_db_path) as db_manager:
-                await run_sync_workflow(client, config, entities, db_manager, verify_references, option_set_fields)
+        # Load entities if custom path provided
+        entities = None
+        if entities_config:
+            entities = load_entity_configs(path=entities_config)
 
-        sys.exit(0)
+        # Load optionsets if custom path provided
+        optionsets = None
+        if optionsets_config:
+            optionsets = load_optionsets_config(path=optionsets_config)
+
+        print("✓ Configuration loaded")
+
+        # [2] Run sync (with console output)
+        print("\n[2/2] Running sync workflow...")
+
+        # Create a simple logger that prints to console
+        console_logger = logging.getLogger("sync")
+        console_logger.setLevel(logging.INFO)
+        if not console_logger.handlers:
+            handler = logging.StreamHandler()
+            handler.setFormatter(logging.Formatter("%(message)s"))
+            console_logger.addHandler(handler)
+
+        success = await run_sync(
+            config=config,
+            entities_config=entities,
+            optionsets_config=optionsets,
+            verify_reference=verify_references,
+            logger=console_logger,
+        )
+
+        if success:
+            print("\n✓ Sync completed successfully")
+            sys.exit(0)
+        else:
+            print("\n❌ Sync failed - check logs for details")
+            sys.exit(1)
 
     except KeyboardInterrupt:
         print("\n\nInterrupted by user")

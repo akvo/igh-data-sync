@@ -18,6 +18,14 @@ build/
 schema_validation_report.json
 schema_validation_report.md
 
+# Coverage reports
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+*.cover
+.pytest_cache/
+
 # Database files
 *.db
 *.sqlite

@@ -21,6 +21,10 @@ A Python package for Microsoft Dataverse integration that validates schemas and 
   - Junction table versioning with relationship snapshots
   - Point-in-time queries and full audit trail
   - Optimized indexes for efficient temporal queries
+- ✅ **Programmatic API** for Apache Airflow and orchestration tools
+  - `async def run_sync()` function with full workflow management
+  - Silent by default with optional logging integration
+  - Returns boolean for success/failure status
 - ✅ Auto-refresh authentication
 - ✅ Retry with exponential backoff
 - ✅ 429 rate limit handling
@@ -158,9 +162,11 @@ igh-data-sync/
 ├── .env.example                 # Environment template
 ├── README.md                    # This file
 ├── CLAUDE.md                    # AI coding assistant guidance
+├── examples/
+│   └── example_run_sync_usage.py # Programmatic API usage examples (Airflow)
 ├── src/
 │   └── igh_data_sync/           # Main package (import as: igh_data_sync)
-│       ├── __init__.py          # Package root
+│       ├── __init__.py          # Package root (exports run_sync)
 │       ├── auth.py              # OAuth authentication with auto-refresh
 │       ├── dataverse_client.py  # Async HTTP client with retry/pagination
 │       ├── config.py            # Configuration loading with entity mapping
@@ -187,7 +193,7 @@ igh-data-sync/
 │           ├── filtered_sync.py     # Filtered entity transitive closure
 │           ├── reference_verifier.py # FK integrity verification
 │           └── relationship_graph.py # FK relationship graph
-└── tests/                       # Test suite (107 tests, 65%+ coverage)
+└── tests/                       # Test suite (121 tests, 59%+ coverage)
     ├── conftest.py              # Shared test fixtures
     ├── unit/                    # Unit tests (mirror src/ structure)
     │   ├── test_auth.py         # OAuth authentication tests
@@ -334,8 +340,8 @@ pytest -k "test_filtered_sync"
 ```
 
 **Test Statistics:**
-- 107 tests total
-- Code coverage: 65%+
+- 121 tests total
+- Code coverage: 59%+
 - All tests passing
 
 ### Linting and Formatting
@@ -513,6 +519,87 @@ The following Dataverse entities are **intentionally excluded** from sync:
 These entities were identified by analyzing foreign key references in the synced entities against the full Dataverse $metadata. They can be added to `entities_config.json` if needed in the future.
 
 ## Usage
+
+### Programmatic API (Apache Airflow / Python Scripts)
+
+Use `run_sync()` to call the sync workflow programmatically from Apache Airflow DAGs or other Python scripts:
+
+```python
+import asyncio
+import logging
+from igh_data_sync import run_sync
+from igh_data_sync.config import Config
+
+async def main():
+    # Create configuration
+    config = Config(
+        api_url="https://org.api.crm.dynamics.com/api/data/v9.2/",
+        client_id="your-client-id",
+        client_secret="your-client-secret",
+        scope="https://org.crm.dynamics.com/.default",
+        sqlite_db_path="dataverse.db"
+    )
+
+    # Setup logger (optional - omit for silent operation)
+    logger = logging.getLogger(__name__)
+
+    # Run sync
+    success = await run_sync(
+        config=config,
+        verify_reference=True,  # Optional: verify FK integrity
+        logger=logger           # Optional: for integrated logging
+    )
+
+    if not success:
+        raise Exception("Sync failed")
+
+asyncio.run(main())
+```
+
+**Apache Airflow Example:**
+
+```python
+from airflow import DAG
+from airflow.operators.python import PythonOperator
+from datetime import datetime
+import asyncio
+from igh_data_sync import run_sync
+from igh_data_sync.config import Config
+
+def sync_dataverse_task(**context):
+    config = Config(
+        api_url=Variable.get("DATAVERSE_API_URL"),
+        client_id=Variable.get("DATAVERSE_CLIENT_ID"),
+        client_secret=Variable.get("DATAVERSE_CLIENT_SECRET"),
+        scope=Variable.get("DATAVERSE_SCOPE"),
+        sqlite_db_path="/data/dataverse.db"
+    )
+
+    success = asyncio.run(run_sync(
+        config=config,
+        verify_reference=True,
+        logger=context['task_instance'].log  # Use Airflow's logger
+    ))
+
+    if not success:
+        raise Exception("Dataverse sync failed")
+
+with DAG('dataverse_sync', start_date=datetime(2024, 1, 1), schedule_interval='@daily') as dag:
+    sync_task = PythonOperator(task_id='sync_dataverse', python_callable=sync_dataverse_task)
+```
+
+See `examples/example_run_sync_usage.py` for more examples.
+
+**API Reference:**
+```python
+async def run_sync(
+    config: Config,                              # Required: API credentials and DB path
+    entities_config: Optional[list[EntityConfig]] = None,  # Optional: custom entities
+    optionsets_config: Optional[dict] = None,    # Optional: custom option sets
+    verify_reference: bool = False,              # Optional: verify FK integrity
+    logger: Optional[logging.Logger] = None      # Optional: for logging output
+) -> bool:  # Returns True on success, False on failure
+```
 
 ### Schema Validation
 
@@ -704,16 +791,17 @@ pytest --cov=lib --cov-report=term-missing tests/
 
 ### Test Coverage
 
-Current coverage: **65%+** (107 tests passing)
+Current coverage: **59%+** (121 tests passing)
 
 **Coverage by module:**
 - igh_data_sync/auth.py: 96.77%
-- igh_data_sync/dataverse_client.py: 50.00%
-- igh_data_sync/sync/database.py: 92%+ (includes SCD2 and junction table temporal tracking)
+- igh_data_sync/dataverse_client.py: 47.31%
+- igh_data_sync/sync/database.py: 91%+ (includes SCD2 and junction table temporal tracking)
 - igh_data_sync/sync/entity_sync.py: 57.50%
-- igh_data_sync/sync/filtered_sync.py: 63.24%
-- igh_data_sync/validation/validator.py: 84.51%
-- igh_data_sync/type_mapping.py: 84.62%
+- igh_data_sync/sync/filtered_sync.py: 74.03%
+- igh_data_sync/validation/validator.py: 75.59%
+- igh_data_sync/type_mapping.py: 89.00%
+- igh_data_sync/scripts/sync.py: 50.67% (includes new run_sync API)
 
 **Test types:**
 - **Unit tests** (tests/unit/): Individual component testing
@@ -841,7 +929,8 @@ Example CI workflow:
 - ✅ Sync state tracking (_sync_state, _sync_log)
 - ✅ SCD2 UPSERT operations with change detection
 - ✅ Option set configuration for INTEGER columns
-- ✅ 107 tests (65%+ coverage), all passing
+- ✅ **Programmatic API** (`run_sync()`) for Apache Airflow integration
+- ✅ 121 tests (59%+ coverage), all passing
 - ✅ Pre-commit hooks (ruff, pylint)
 - ✅ Type checking and linting
 

@@ -27,37 +27,8 @@ from igh_data_sync.validation.report_generator import ReportGenerator
 from igh_data_sync.validation.schema_comparer import SchemaComparer
 
 
-async def main():
-    """Main validation workflow."""
-    # Parse command-line arguments
-    parser = argparse.ArgumentParser(description="Validate Dataverse schema against database")
-    parser.add_argument(
-        "--db-type",
-        choices=["sqlite", "postgresql"],
-        help="Database type (default: auto-detect from config)",
-    )
-    parser.add_argument(
-        "--json-report",
-        default="schema_validation_report.json",
-        help="Path for JSON report (default: schema_validation_report.json)",
-    )
-    parser.add_argument(
-        "--md-report",
-        default="schema_validation_report.md",
-        help="Path for Markdown report (default: schema_validation_report.md)",
-    )
-    parser.add_argument(
-        "--entities-config",
-        default="entities_config.json",
-        help="Path to entities config file (default: entities_config.json)",
-    )
-    parser.add_argument(
-        "--env-file",
-        default=".env",
-        help="Path to .env file (default: .env)",
-    )
-    args = parser.parse_args()
-
+async def async_main(db_type, json_report, md_report, entities_config, env_file):
+    """Async validation workflow."""
     print("=" * 60)
     print("DATAVERSE SCHEMA VALIDATOR")
     print("=" * 60)
@@ -65,14 +36,14 @@ async def main():
     try:
         # [1/6] Load Configuration
         print("\n[1/6] Loading configuration...")
-        config = load_config(env_path=args.env_file)
-        entities = load_entities(path=args.entities_config)
+        config = load_config(env_path=env_file)
+        entities = load_entities(path=entities_config)
         print("✓ Loaded configuration")
         print(f"  - API URL: {config.api_url}")
         print(f"  - Entities to check: {len(entities)}")
 
         # Determine database type
-        db_type = args.db_type or config.get_db_type()
+        db_type = db_type or config.get_db_type()
         print(f"  - Database type: {db_type}")
 
         # [2/6] Authenticate with Dataverse
@@ -110,7 +81,7 @@ async def main():
             differences,
             dataverse_schemas,
             database_schemas,
-            output_path=args.json_report,
+            output_path=json_report,
         )
 
         # Generate Markdown report
@@ -118,7 +89,7 @@ async def main():
             differences,
             dataverse_schemas,
             database_schemas,
-            output_path=args.md_report,
+            output_path=md_report,
         )
 
         # Print summary and get pass/fail status
@@ -136,5 +107,46 @@ async def main():
         sys.exit(1)
 
 
+def main():
+    """CLI entry point for validate-schema command."""
+    parser = argparse.ArgumentParser(description="Validate Dataverse schema against database")
+    parser.add_argument(
+        "--db-type",
+        choices=["sqlite", "postgresql"],
+        help="Database type (default: auto-detect from config)",
+    )
+    parser.add_argument(
+        "--json-report",
+        default="schema_validation_report.json",
+        help="Path for JSON report (default: schema_validation_report.json)",
+    )
+    parser.add_argument(
+        "--md-report",
+        default="schema_validation_report.md",
+        help="Path for Markdown report (default: schema_validation_report.md)",
+    )
+    parser.add_argument(
+        "--entities-config",
+        default="entities_config.json",
+        help="Path to entities config file (default: entities_config.json)",
+    )
+    parser.add_argument(
+        "--env-file",
+        default=".env",
+        help="Path to .env file (default: .env)",
+    )
+    args = parser.parse_args()
+
+    asyncio.run(
+        async_main(
+            db_type=args.db_type,
+            json_report=args.json_report,
+            md_report=args.md_report,
+            entities_config=args.entities_config,
+            env_file=args.env_file,
+        )
+    )
+
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

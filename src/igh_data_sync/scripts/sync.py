@@ -289,9 +289,9 @@ async def run_sync_workflow(client, config, entities, db_manager, verify_referen
     _print_summary(total_added, total_updated)
 
 
-async def main(verify_references=False, env_file=None, entities_config=None, optionsets_config=None):
+async def async_main(verify_references=False, env_file=None, entities_config=None, optionsets_config=None):
     """
-    Main entry point - thin shell for configuration and authentication.
+    Async main workflow - handles configuration and sync execution.
 
     This function handles:
     - Loading configuration from environment
@@ -330,7 +330,8 @@ async def main(verify_references=False, env_file=None, entities_config=None, opt
         sys.exit(1)
 
 
-if __name__ == "__main__":
+def main():
+    """CLI entry point for sync-dataverse command."""
     parser = argparse.ArgumentParser(description="Sync Dataverse entities to SQLite database")
     parser.add_argument(
         "--verify",
@@ -352,10 +353,14 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     asyncio.run(
-        main(
+        async_main(
             verify_references=args.verify,
             env_file=args.env_file,
             entities_config=args.entities_config,
             optionsets_config=args.optionsets_config,
         )
     )
+
+
+if __name__ == "__main__":
+    main()

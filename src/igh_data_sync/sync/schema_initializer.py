@@ -1,7 +1,5 @@
 """Schema initialization using authoritative $metadata XML."""
 
-import json
-from pathlib import Path
 from typing import Optional
 
 from ..config import EntityConfig
@@ -62,7 +60,7 @@ def generate_create_table_sql(
     return "\n".join(lines)
 
 
-async def initialize_tables(_config, entities: list[EntityConfig], client, db_manager):
+async def initialize_tables(_config, entities: list[EntityConfig], client, db_manager, option_set_fields_by_entity: Optional[dict] = None):
     """
     Create tables using authoritative $metadata schemas.
 
@@ -71,25 +69,21 @@ async def initialize_tables(_config, entities: list[EntityConfig], client, db_ma
         entities: List of EntityConfig objects to initialize
         client: DataverseClient instance
         db_manager: DatabaseManager instance
+        option_set_fields_by_entity: Optional dict mapping entity names to option set field names
 
     Raises:
         RuntimeError: If schema fetch or table creation fails
     """
 
-    # STEP 1: Load option set config if exists
-    config_path = Path("config/optionsets.json")
-    option_set_fields_by_entity = {}
-
-    if config_path.exists():
-        print(f"Loading option set configuration from {config_path}...")
-        with Path(config_path).open(encoding="utf-8") as f:
-            option_set_fields_by_entity = json.load(f)
+    # STEP 1: Use provided option set config
+    if option_set_fields_by_entity is None:
+        option_set_fields_by_entity = {}
+        print("⚠️  No option set config provided - tables will use TEXT for option sets")
+        print("   To fix: Run sync, then: generate-optionset-config > custom_optionsets.json")
+    elif option_set_fields_by_entity:
         total_fields = sum(len(fields) for fields in option_set_fields_by_entity.values())
         num_entities = len(option_set_fields_by_entity)
-        print(f"  ✓ Loaded config for {num_entities} entities, {total_fields} option set fields")
-    else:
-        print("⚠️  No option set config found - tables will use TEXT for option sets")
-        print(f"   To fix: Run sync, then: python generate_optionset_config.py > {config_path}")
+        print(f"  ✓ Using option set config: {num_entities} entities, {total_fields} fields")
 
     # STEP 2: Fetch schemas from $metadata
     fetcher = DataverseSchemaFetcher(client, target_db="sqlite")

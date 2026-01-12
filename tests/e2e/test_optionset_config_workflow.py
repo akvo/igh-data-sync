@@ -1,6 +1,5 @@
 """End-to-end tests for option set configuration workflow."""
 
-import json
 import tempfile
 from pathlib import Path
 from unittest.mock import AsyncMock
@@ -94,16 +93,8 @@ async def test_schema_creation_with_config_creates_integer_columns(
     mock_metadata_xml, temp_db, temp_config_dir, monkeypatch
 ):
     """With config, option set fields should be created as INTEGER."""
-    # Create config file in temp directory
-    config_path = temp_config_dir / "config" / "optionsets.json"
-    config_path.parent.mkdir(parents=True, exist_ok=True)
-
+    # Define option set configuration
     config_data = {"vin_disease": ["statuscode", "new_globalhealtharea"]}
-    with Path(config_path).open("w", encoding="utf-8") as f:
-        json.dump(config_data, f)
-
-    # Change to temp config dir so config is found
-    monkeypatch.chdir(temp_config_dir)
 
     # Mock client that returns metadata
     mock_client = AsyncMock()
@@ -123,8 +114,8 @@ async def test_schema_creation_with_config_creates_integer_columns(
             )
         ]
 
-        # Initialize tables with config
-        await initialize_tables(None, entities, mock_client, db_manager)
+        # Initialize tables with config passed as parameter
+        await initialize_tables(None, entities, mock_client, db_manager, config_data)
 
         # Verify table was created
         cursor = db_manager.conn.cursor()
@@ -141,18 +132,11 @@ async def test_schema_creation_with_config_creates_integer_columns(
 @pytest.mark.asyncio
 async def test_config_file_with_multiple_entities(temp_db, temp_config_dir, monkeypatch):
     """Config should correctly map option sets for multiple entities."""
-    # Create config with multiple entities
-    config_path = temp_config_dir / "config" / "optionsets.json"
-    config_path.parent.mkdir(parents=True, exist_ok=True)
-
+    # Define config with multiple entities
     config_data = {
         "vin_disease": ["statuscode", "new_globalhealtharea"],
         "vin_product": ["statuscode", "vin_type"],
     }
-    with Path(config_path).open("w", encoding="utf-8") as f:
-        json.dump(config_data, f)
-
-    monkeypatch.chdir(temp_config_dir)
 
     # Mock metadata for multiple entities
     multi_entity_xml = """<?xml version="1.0" encoding="utf-8"?>
@@ -197,7 +181,8 @@ async def test_config_file_with_multiple_entities(temp_db, temp_config_dir, monk
             ),
         ]
 
-        await initialize_tables(None, entities, mock_client, db_manager)
+        # Pass config as parameter
+        await initialize_tables(None, entities, mock_client, db_manager, config_data)
 
         cursor = db_manager.conn.cursor()
 
@@ -220,15 +205,8 @@ async def test_config_loading_shows_informative_messages(
     mock_metadata_xml, temp_db, temp_config_dir, monkeypatch, capsys
 ):
     """Config loading should print helpful messages to user."""
-    # Create config file
-    config_path = temp_config_dir / "config" / "optionsets.json"
-    config_path.parent.mkdir(parents=True, exist_ok=True)
-
+    # Define config data
     config_data = {"vin_disease": ["statuscode", "new_globalhealtharea"]}
-    with Path(config_path).open("w", encoding="utf-8") as f:
-        json.dump(config_data, f)
-
-    monkeypatch.chdir(temp_config_dir)
 
     mock_client = AsyncMock()
     mock_client.get_metadata = AsyncMock(return_value=mock_metadata_xml)
@@ -245,20 +223,17 @@ async def test_config_loading_shows_informative_messages(
             )
         ]
 
-        await initialize_tables(None, entities, mock_client, db_manager)
+        # Pass config as parameter
+        await initialize_tables(None, entities, mock_client, db_manager, config_data)
 
         # Check printed output
         captured = capsys.readouterr()
-        assert "Loading option set configuration from config/optionsets.json" in captured.out
-        assert "Loaded config for 1 entities, 2 option set fields" in captured.out
+        assert "Using option set config: 1 entities, 2 fields" in captured.out
 
 
 @pytest.mark.asyncio
 async def test_no_config_shows_warning_message(mock_metadata_xml, temp_db, temp_config_dir, monkeypatch, capsys):
     """Without config, should show helpful warning."""
-    # No config file created
-    monkeypatch.chdir(temp_config_dir)
-
     mock_client = AsyncMock()
     mock_client.get_metadata = AsyncMock(return_value=mock_metadata_xml)
 
@@ -274,10 +249,11 @@ async def test_no_config_shows_warning_message(mock_metadata_xml, temp_db, temp_
             )
         ]
 
+        # Call without config parameter (defaults to None)
         await initialize_tables(None, entities, mock_client, db_manager)
 
         # Check printed output
         captured = capsys.readouterr()
-        assert "No option set config found" in captured.out
+        assert "No option set config provided" in captured.out
         assert "tables will use TEXT for option sets" in captured.out
-        assert "python generate_optionset_config.py" in captured.out
+        assert "generate-optionset-config" in captured.out

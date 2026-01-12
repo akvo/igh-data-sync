@@ -21,7 +21,7 @@ import sys
 import traceback
 
 from igh_data_sync.auth import DataverseAuth
-from igh_data_sync.config import load_config, load_entity_configs
+from igh_data_sync.config import load_config, load_entity_configs, load_optionsets_config
 from igh_data_sync.dataverse_client import DataverseClient
 from igh_data_sync.sync.database import DatabaseManager
 from igh_data_sync.sync.entity_sync import sync_entity
@@ -56,14 +56,14 @@ def _authenticate(config):
     return token
 
 
-async def _initialize_database(config, entities_to_create, client, db_manager):
+async def _initialize_database(config, entities_to_create, client, db_manager, option_set_fields_by_entity=None):
     """Initialize database tables."""
     print("\n[4/7] Initializing database...")
     db_manager.init_sync_tables()
     print("  ✓ Sync tables initialized")
 
     if entities_to_create:
-        await initialize_tables(config, entities_to_create, client, db_manager)
+        await initialize_tables(config, entities_to_create, client, db_manager, option_set_fields_by_entity)
 
 
 async def _prepare_sync(client, valid_entities):
@@ -220,7 +220,7 @@ def _print_summary(total_added, total_updated):
     print("=" * 60)
 
 
-async def run_sync_workflow(client, config, entities, db_manager, verify_references=False):
+async def run_sync_workflow(client, config, entities, db_manager, verify_references=False, option_set_fields_by_entity=None):
     """
     Core sync workflow - extracted for testability.
 
@@ -233,6 +233,7 @@ async def run_sync_workflow(client, config, entities, db_manager, verify_referen
         entities: List of EntityConfig objects to sync
         db_manager: DatabaseManager instance
         verify_references: If True, verify reference integrity after sync
+        option_set_fields_by_entity: Optional dict mapping entity names to option set field names
     """
     # Validate schema
     print("\n[3/7] Validating schema...")
@@ -248,7 +249,7 @@ async def run_sync_workflow(client, config, entities, db_manager, verify_referen
         return
 
     # Initialize database and prepare
-    await _initialize_database(config, entities_to_create, client, db_manager)
+    await _initialize_database(config, entities_to_create, client, db_manager, option_set_fields_by_entity)
     fetcher, dv_schemas = await _prepare_sync(client, valid_entities)
     relationship_graph = await _build_relationship_graph(fetcher, entities)
 
@@ -312,12 +313,13 @@ async def async_main(verify_references=False, env_file=None, entities_config=Non
     try:
         # [1-2] Load config and authenticate
         config, entities = _load_configuration(env_file=env_file, entities_config=entities_config)
+        option_set_fields = load_optionsets_config(path=optionsets_config)
         token = _authenticate(config)
 
         # [3-8] Run sync workflow
         async with DataverseClient(config, token) as client:
             with DatabaseManager(config.sqlite_db_path) as db_manager:
-                await run_sync_workflow(client, config, entities, db_manager, verify_references)
+                await run_sync_workflow(client, config, entities, db_manager, verify_references, option_set_fields)
 
         sys.exit(0)
 

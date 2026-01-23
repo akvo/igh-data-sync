@@ -66,7 +66,9 @@ def _authenticate(config, logger=None):
     return token
 
 
-async def _initialize_database(config, entities_to_create, client, db_manager, option_set_fields_by_entity=None, logger=None):
+async def _initialize_database(
+    config, entities_to_create, client, db_manager, option_set_fields_by_entity=None, logger=None
+):
     """Initialize database tables."""
     _log("\n[4/7] Initializing database...", logger)
     db_manager.init_sync_tables()
@@ -123,7 +125,7 @@ async def _sync_unfiltered_entities(unfiltered, dv_schemas, client, db_manager, 
     return total_added, total_updated, failed_entities
 
 
-async def _sync_filtered_entities(
+async def _sync_filtered_entities(  # noqa: PLR0913, PLR0917
     filtered,
     dv_schemas,
     client,
@@ -237,7 +239,9 @@ def _print_summary(total_added, total_updated, logger=None):
     _log("=" * 60, logger)
 
 
-async def run_sync_workflow(client, config, entities, db_manager, verify_references=False, option_set_fields_by_entity=None, logger=None):
+async def run_sync_workflow(  # noqa: PLR0913, PLR0914, PLR0917
+    client, config, entities, db_manager, verify_references=False, option_set_fields_by_entity=None, logger=None
+):
     """
     Core sync workflow - extracted for testability.
 
@@ -333,7 +337,9 @@ async def run_sync_workflow(client, config, entities, db_manager, verify_referen
 
     # Report and verify
     _report_failures(failed_entities, logger)
-    has_reference_issues, reference_issues = _verify_references(verify_references, db_manager, relationship_graph, logger)
+    has_reference_issues, reference_issues = _verify_references(
+        verify_references, db_manager, relationship_graph, logger
+    )
 
     # Summary
     _print_summary(total_added, total_updated, logger)
@@ -351,7 +357,7 @@ async def run_sync_workflow(client, config, entities, db_manager, verify_referen
     }
 
 
-async def run_sync(
+async def run_sync(  # noqa: C901, PLR0912
     config: Config,
     entities_config: Optional[list[EntityConfig]] = None,
     optionsets_config: Optional[dict] = None,
@@ -425,8 +431,9 @@ async def run_sync(
         token = auth.get_token()
     except Exception as e:
         if logger:
-            logger.error(f"Authentication failed: {e}")
-        raise RuntimeError(f"Authentication failed: {e}") from e
+            logger.exception("Authentication failed")
+        msg = f"Authentication failed: {e}"
+        raise RuntimeError(msg) from e
 
     # [4] Run sync workflow with context managers
     if logger:
@@ -451,9 +458,7 @@ async def run_sync(
         if logger:
             if success:
                 logger.info(
-                    f"Sync completed successfully: "
-                    f"+{results['total_added']} added, "
-                    f"{results['total_updated']} updated"
+                    f"Sync completed successfully: +{results['total_added']} added, {results['total_updated']} updated"
                 )
             else:
                 logger.error(
@@ -463,7 +468,7 @@ async def run_sync(
                     f"{len(results.get('reference_errors', []))} reference errors"
                 )
 
-        return success
+        return success  # noqa: TRY300 - return at end of try block is intentional
 
     except Exception:
         if logger:

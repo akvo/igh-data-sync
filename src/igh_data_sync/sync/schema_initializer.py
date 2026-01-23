@@ -60,7 +60,9 @@ def generate_create_table_sql(
     return "\n".join(lines)
 
 
-async def initialize_tables(_config, entities: list[EntityConfig], client, db_manager, option_set_fields_by_entity: Optional[dict] = None):
+async def initialize_tables(
+    _config, entities: list[EntityConfig], client, db_manager, option_set_fields_by_entity: Optional[dict] = None
+):
     """
     Create tables using authoritative $metadata schemas.
 

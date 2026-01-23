@@ -34,6 +34,63 @@ from typing import Optional
 from igh_data_sync.config import get_default_config_path
 
 
+def _load_table_to_entity_mapping(entities_config_path: Optional[str]) -> dict[str, str]:
+    """Load entity config and return plural table name to singular entity name mapping."""
+    if entities_config_path is None:
+        entities_config_path = get_default_config_path("entities_config.json")
+
+    config_path = Path(entities_config_path)
+    if not config_path.exists():
+        print(f"❌ entities_config.json not found at {entities_config_path}", file=sys.stderr)
+        sys.exit(1)
+
+    with Path(config_path).open(encoding="utf-8") as f:
+        entities_config = json.load(f)
+
+    return {e["api_name"]: e["name"] for e in entities_config["entities"]}
+
+
+def _process_optionset_field(
+    cursor: sqlite3.Cursor,
+    field_name: str,
+    table_to_entity: dict[str, str],
+    option_sets_by_entity: dict[str, list[str]],
+) -> None:
+    """Process a single option set field, mapping it to entities."""
+    # Find which entity tables have this field
+    cursor.execute("""
+        SELECT name FROM sqlite_master
+        WHERE type='table'
+          AND substr(name, 1, 1) != '_'
+          AND name NOT LIKE 'sqlite_%'
+    """)
+
+    entity_tables = [row[0] for row in cursor.fetchall()]
+
+    for entity_table in entity_tables:
+        cursor.execute(f"PRAGMA table_info({entity_table})")
+        columns = {col[1]: col[2] for col in cursor.fetchall()}
+
+        if field_name not in columns:
+            continue
+
+        # Only include INTEGER fields (single-select option sets)
+        column_type = columns[field_name]
+        if column_type != "INTEGER":
+            print(f"  ⊘ {entity_table}.{field_name} (skipped: {column_type}, not INTEGER)", file=sys.stderr)
+            continue
+
+        entity_name = table_to_entity.get(entity_table)
+        if entity_name is None:
+            continue
+
+        if entity_name not in option_sets_by_entity:
+            option_sets_by_entity[entity_name] = []
+
+        option_sets_by_entity[entity_name].append(field_name)
+        print(f"  ✓ {entity_name}.{field_name}", file=sys.stderr)
+
+
 def extract_option_sets(db_path: str, entities_config_path: Optional[str] = None) -> dict[str, list[str]]:
     """
     Extract option set fields from database.
@@ -46,20 +103,7 @@ def extract_option_sets(db_path: str, entities_config_path: Optional[str] = None
     Returns:
         Dict mapping entity name to list of option set field names
     """
-    # Load entity config to get correct singular names
-    if entities_config_path is None:
-        entities_config_path = get_default_config_path("entities_config.json")
-
-    config_path = Path(entities_config_path)
-    if not config_path.exists():
-        print(f"❌ entities_config.json not found at {entities_config_path}", file=sys.stderr)
-        sys.exit(1)
-
-    with Path(config_path).open(encoding="utf-8") as f:
-        entities_config = json.load(f)
-
-    # Build mapping: plural table name → singular entity name
-    table_to_entity = {e["api_name"]: e["name"] for e in entities_config["entities"]}
+    table_to_entity = _load_table_to_entity_mapping(entities_config_path)
 
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
@@ -79,49 +123,11 @@ def extract_option_sets(db_path: str, entities_config_path: Optional[str] = None
 
     print(f"Found {len(optionset_tables)} option set tables", file=sys.stderr)
 
-    # Map option set fields to entities
-    option_sets_by_entity = {}
+    option_sets_by_entity: dict[str, list[str]] = {}
 
     for table in optionset_tables:
-        # Extract field name from table name (_optionset_<field_name>)
         field_name = table.replace("_optionset_", "")
-
-        # Find which entity tables have this field
-        # Filter out internal tables (_junction_, _optionset_, _sync_state) and SQLite tables
-        cursor.execute("""
-            SELECT name FROM sqlite_master
-            WHERE type='table'
-              AND substr(name, 1, 1) != '_'  -- Exclude tables starting with underscore
-              AND name NOT LIKE 'sqlite_%'  -- Exclude SQLite tables
-        """)
-
-        entity_tables = [row[0] for row in cursor.fetchall()]
-
-        for entity_table in entity_tables:
-            # Check if this entity has the field
-            cursor.execute(f"PRAGMA table_info({entity_table})")
-            columns = {col[1]: col[2] for col in cursor.fetchall()}  # name -> type
-
-            if field_name in columns:
-                # IMPORTANT: Only include INTEGER fields (single-select option sets)
-                # TEXT fields are multi-select option sets and must stay as TEXT
-                column_type = columns[field_name]
-                if column_type != "INTEGER":
-                    print(f"  ⊘ {entity_table}.{field_name} (skipped: {column_type}, not INTEGER)", file=sys.stderr)
-                    continue
-
-                # Look up the correct singular entity name from config
-                entity_name = table_to_entity.get(entity_table)
-
-                if entity_name is None:
-                    # Table not in config - skip it
-                    continue
-
-                if entity_name not in option_sets_by_entity:
-                    option_sets_by_entity[entity_name] = []
-
-                option_sets_by_entity[entity_name].append(field_name)
-                print(f"  ✓ {entity_name}.{field_name}", file=sys.stderr)
+        _process_optionset_field(cursor, field_name, table_to_entity, option_sets_by_entity)
 
     conn.close()
 

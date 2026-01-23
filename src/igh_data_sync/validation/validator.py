@@ -138,6 +138,7 @@ async def validate_schema_before_sync(config, entities, client, _db_manager, log
 
     Returns: (valid_entities, entities_to_create, differences, validation_passed)
     """
+
     def _log(message):
         if logger:
             logger.info(message)
@@ -180,6 +181,7 @@ def _report_validation_results(differences, logger=None):
     Returns:
         bool: True if validation passed (no errors), False if errors found
     """
+
     def _log(message):
         if logger:
             logger.info(message)

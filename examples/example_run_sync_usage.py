@@ -7,6 +7,7 @@ This demonstrates how to use run_sync from Apache Airflow DAGs or other Python s
 
 import asyncio
 import logging
+import sys
 
 from igh_data_sync import run_sync
 from igh_data_sync.config import Config
@@ -15,10 +16,7 @@ from igh_data_sync.config import Config
 async def main():
     """Example of using run_sync programmatically."""
     # Setup logging
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    )
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
     logger = logging.getLogger(__name__)
 
     # Create configuration
@@ -26,7 +24,7 @@ async def main():
     config = Config(
         api_url="https://your-org.api.crm.dynamics.com/api/data/v9.2/",
         client_id="your-client-id",
-        client_secret="your-client-secret",
+        client_secret="your-client-secret",  # noqa: S106 - example placeholder
         scope="https://your-org.crm.dynamics.com/.default",
         sqlite_db_path="dataverse.db",
     )
@@ -48,11 +46,11 @@ async def main():
             logger.error("❌ Sync failed - check logs for details")
             return 1
 
-    except RuntimeError as e:
-        logger.error(f"Authentication failed: {e}")
+    except RuntimeError:
+        logger.exception("Authentication failed")
         return 1
-    except Exception as e:
-        logger.exception(f"Unexpected error: {e}")
+    except Exception:
+        logger.exception("Unexpected error")
         return 1
 
 
@@ -100,9 +98,8 @@ async def airflow_dag_example():
             python_callable=sync_dataverse_task,
         )
     """
-    pass
 
 
 if __name__ == "__main__":
     exit_code = asyncio.run(main())
-    exit(exit_code)
+    sys.exit(exit_code)

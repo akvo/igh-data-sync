@@ -4,10 +4,10 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from lib.config import EntityConfig
-from lib.dataverse_client import DataverseClient
-from lib.sync.database import DatabaseManager
-from lib.validation.validator import validate_schema_before_sync
+from igh_data_sync.config import EntityConfig
+from igh_data_sync.dataverse_client import DataverseClient
+from igh_data_sync.sync.database import DatabaseManager
+from igh_data_sync.validation.validator import validate_schema_before_sync
 
 
 @pytest.fixture
@@ -43,7 +43,7 @@ class TestValidator:
             db_manager.init_sync_tables()
 
             # Run validation
-            valid_entities, entities_to_create, _diffs = await validate_schema_before_sync(
+            valid_entities, entities_to_create, _diffs, validation_passed = await validate_schema_before_sync(
                 test_config,
                 [test_entity],
                 mock_client,
@@ -51,6 +51,7 @@ class TestValidator:
             )
 
             # Verify results
+            assert validation_passed is True
             assert len(valid_entities) == 1
             assert valid_entities[0].name == "account"
             assert len(entities_to_create) == 1

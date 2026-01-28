@@ -1,6 +1,6 @@
-# Dataverse Schema Validator & Sync
+# igh-data-sync
 
-A comprehensive toolkit for Microsoft Dataverse that validates schemas and syncs data to SQLite using authoritative $metadata XML for type-accurate table creation.
+A Python package for Microsoft Dataverse integration that validates schemas and syncs data to SQLite/PostgreSQL using authoritative $metadata XML for type-accurate table creation with SCD2 temporal tracking.
 
 ## Features
 
@@ -21,6 +21,10 @@ A comprehensive toolkit for Microsoft Dataverse that validates schemas and syncs
   - Junction table versioning with relationship snapshots
   - Point-in-time queries and full audit trail
   - Optimized indexes for efficient temporal queries
+- ✅ **Programmatic API** for Apache Airflow and orchestration tools
+  - `async def run_sync()` function with full workflow management
+  - Silent by default with optional logging integration
+  - Returns boolean for success/failure status
 - ✅ Auto-refresh authentication
 - ✅ Retry with exponential backoff
 - ✅ 429 rate limit handling
@@ -151,42 +155,47 @@ Given this configuration:
 ## Project Structure
 
 ```
- igh-clean-sync/
-├── validate_schema.py          # Schema validator entrypoint
-├── sync_dataverse.py            # Sync tool entrypoint
-├── generate_optionset_config.py # Generate option set configuration
-├── entities_config.json         # Entity configuration with filtered sync
-├── config/
-│   └── optionsets.json          # Option set field configuration
+igh-data-sync/
+├── pyproject.toml               # Package configuration (build, dependencies, tools)
+├── .pre-commit-config.yaml      # Pre-commit hooks configuration
 ├── .env                         # Credentials (not committed)
-├── .env.example                 # Template
-├── requirements.txt             # Runtime dependencies
-├── requirements-dev.txt         # Development dependencies (NEW)
-├── pyproject.toml               # Project config (pytest, ruff, pylint) (NEW)
-├── .pre-commit-config.yaml      # Pre-commit hooks configuration (NEW)
-├── lib/                         # Reusable utilities
-│   ├── auth.py                  # OAuth authentication with auto-refresh
-│   ├── dataverse_client.py      # Async HTTP client with retry/pagination
-│   ├── config.py                # Configuration loading with entity mapping
-│   ├── type_mapping.py          # Data structures and type mappings
-│   ├── validation/              # Validation components
-│   │   ├── metadata_parser.py   # Parse $metadata XML
-│   │   ├── dataverse_schema.py  # Fetch schemas from Dataverse
-│   │   ├── database_schema.py   # Query database schemas
-│   │   ├── schema_comparer.py   # Compare and detect differences
-│   │   ├── report_generator.py  # Generate JSON/Markdown reports
-│   │   └── validator.py         # Pre-sync validation workflow (NEW)
-│   └── sync/                    # Sync components
-│       ├── schema_initializer.py # Create tables from $metadata schemas
-│       ├── database.py          # SQLite operations (UPSERT, tracking)
-│       ├── sync_state.py        # Sync state management
-│       ├── entity_sync.py       # Individual entity sync logic (NEW)
-│       ├── filtered_sync.py     # Filtered entity transitive closure (NEW)
-│       ├── reference_verifier.py # FK integrity verification (NEW)
-│       └── relationship_graph.py # FK relationship graph (NEW)
-└── tests/                       # Test suite (107 tests, 65%+ coverage)
+├── .env.example                 # Environment template
+├── README.md                    # This file
+├── CLAUDE.md                    # AI coding assistant guidance
+├── examples/
+│   └── example_run_sync_usage.py # Programmatic API usage examples (Airflow)
+├── src/
+│   └── igh_data_sync/           # Main package (import as: igh_data_sync)
+│       ├── __init__.py          # Package root (exports run_sync)
+│       ├── auth.py              # OAuth authentication with auto-refresh
+│       ├── dataverse_client.py  # Async HTTP client with retry/pagination
+│       ├── config.py            # Configuration loading with entity mapping
+│       ├── type_mapping.py      # Data structures and type mappings
+│       ├── data/                # Packaged configuration files
+│       │   ├── entities_config.json  # Entity configuration with filtered sync
+│       │   └── optionsets.json       # Option set field configuration
+│       ├── scripts/             # CLI entrypoints
+│       │   ├── sync.py          # sync-dataverse command
+│       │   ├── validate.py      # validate-schema command
+│       │   └── optionset.py     # generate-optionset-config command
+│       ├── validation/          # Schema validation components
+│       │   ├── metadata_parser.py   # Parse $metadata XML
+│       │   ├── dataverse_schema.py  # Fetch schemas from Dataverse
+│       │   ├── database_schema.py   # Query database schemas
+│       │   ├── schema_comparer.py   # Compare and detect differences
+│       │   ├── report_generator.py  # Generate JSON/Markdown reports
+│       │   └── validator.py         # Pre-sync validation workflow
+│       └── sync/                # Data synchronization components
+│           ├── schema_initializer.py # Create tables from $metadata schemas
+│           ├── database.py          # Database operations (SCD2 UPSERT, tracking)
+│           ├── sync_state.py        # Sync state management
+│           ├── entity_sync.py       # Individual entity sync logic
+│           ├── filtered_sync.py     # Filtered entity transitive closure
+│           ├── reference_verifier.py # FK integrity verification
+│           └── relationship_graph.py # FK relationship graph
+└── tests/                       # Test suite (121 tests, 59%+ coverage)
     ├── conftest.py              # Shared test fixtures
-    ├── unit/                    # Unit tests (mirror lib/ structure)
+    ├── unit/                    # Unit tests (mirror src/ structure)
     │   ├── test_auth.py         # OAuth authentication tests
     │   ├── test_config.py       # Configuration tests
     │   ├── test_dataverse_client.py # API client tests
@@ -211,6 +220,51 @@ Given this configuration:
 
 ## Installation
 
+### From Source
+
+```bash
+# Clone the repository
+git clone https://github.com/akvo/igh-data-sync.git
+cd igh-data-sync
+
+# Install the package
+pip install .
+
+# Or install with development dependencies
+pip install -e ".[dev]"
+
+# Copy environment template
+cp .env.example .env
+
+# Edit .env with your credentials
+vim .env
+```
+
+### Using UV (Recommended)
+
+```bash
+# Install UV if not already installed
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Create virtual environment
+uv venv
+source .venv/bin/activate
+
+# Install runtime dependencies only
+uv sync
+
+# Install with dev dependencies (for development)
+uv sync --all-extras
+
+# Copy environment template
+cp .env.example .env
+
+# Edit .env with your credentials
+vim .env
+```
+
+### Using pip (Alternative)
+
 ```bash
 # Create virtual environment
 python3 -m venv .venv
@@ -221,33 +275,24 @@ source .venv/bin/activate
 # On Windows:
 # .venv\Scripts\activate
 
-# Install dependencies
-pip install -r requirements.txt
+# Install package in editable mode
+pip install -e .
 
-# Copy environment template
-cp .env.example .env
-
-# Edit .env with your credentials
-vim .env
+# Or with dev dependencies
+pip install -e ".[dev]"
 ```
 
-## Development Setup
-
-### Install Development Dependencies
-
-```bash
-# Install dev dependencies (includes test, lint, format tools)
-pip install -r requirements-dev.txt
-```
-
-**Development tools included:**
+**Development tools included in [dev] extras:**
 - `pytest` - Test framework with async support
 - `pytest-cov` - Code coverage reporting
 - `pytest-mock` - Mocking utilities
 - `ruff` - Fast Python linter and formatter
 - `pylint` - Additional linting
+- `mypy` - Type checking
 - `pre-commit` - Git hooks for code quality
 - `aioresponses` - Mock async HTTP requests
+
+## Development Setup
 
 ### Pre-commit Hooks
 
@@ -267,6 +312,7 @@ pre-commit run --all-files
 - Large file detection
 - Ruff linting and formatting
 - Pylint code analysis
+- Pytest (runs on commit)
 
 ### Running Tests
 
@@ -281,7 +327,7 @@ pytest tests/unit/
 pytest tests/e2e/
 
 # Run with coverage report
-pytest --cov=lib --cov-report=term-missing
+pytest --cov=src/igh_data_sync --cov-report=term-missing
 
 # Run specific test file
 pytest tests/unit/test_auth.py -v
@@ -294,36 +340,39 @@ pytest -k "test_filtered_sync"
 ```
 
 **Test Statistics:**
-- 107 tests total (10 new SCD2 tests added)
-- Code coverage: 65%+
+- 121 tests total
+- Code coverage: 59%+
 - All tests passing
 
 ### Linting and Formatting
 
 ```bash
 # Check code style (ruff)
-ruff check lib/ tests/
+ruff check src/ tests/
 
 # Auto-fix issues
-ruff check --fix lib/ tests/
+ruff check --fix src/ tests/
 
 # Format code
-ruff format lib/ tests/
+ruff format src/ tests/
 
 # Run pylint
-pylint lib/ tests/
+pylint src/ tests/
 ```
 
 ### Type Checking
 
 ```bash
-# Run type checker (if mypy is added)
-mypy lib/
+# Run type checker
+mypy src/
 ```
 
 ## Configuration
 
-### .env file
+### Environment Variables (.env file)
+
+The package loads environment variables from `.env` file in the current working directory or from system environment:
+
 ```bash
 # Dataverse API Configuration
 DATAVERSE_API_URL=https://your-org.api.crm.dynamics.com/api/data/v9.2/
@@ -332,10 +381,28 @@ DATAVERSE_CLIENT_SECRET=your-client-secret-here
 DATAVERSE_SCOPE=https://your-org.api.crm.dynamics.com/.default
 
 # Database Configuration
-SQLITE_DB_PATH=../dataverse_complete.db
+SQLITE_DB_PATH=./dataverse_complete.db
 # Or for PostgreSQL:
 # POSTGRES_CONNECTION_STRING=postgresql://user:password@localhost:5432/dbname
 ```
+
+**Environment variable loading precedence:**
+1. CLI `--env-file` parameter (explicit path)
+2. `.env` in current working directory
+3. System environment variables
+
+### Configuration Files
+
+The package includes default configuration files in `src/igh_data_sync/data/`:
+- `entities_config.json` - Entity configuration with filtered sync
+- `optionsets.json` - Option set field configuration
+
+**Override defaults with CLI parameters:**
+
+All CLI commands accept optional configuration file parameters:
+- `--env-file PATH` - Custom .env file location
+- `--entities-config PATH` - Custom entities config file
+- `--optionsets-config PATH` - Custom optionsets config file (sync only)
 
 ### entities_config.json
 
@@ -365,7 +432,7 @@ Lists entities to sync/validate with singular/plural name mapping:
 - `filtered`: If true, sync only records linked to already-synced entities
 - `description`: Human-readable description
 
-### config/optionsets.json
+### optionsets.json
 
 Defines which fields are option sets (enums) for proper INTEGER column types:
 
@@ -386,26 +453,25 @@ Defines which fields are option sets (enums) for proper INTEGER column types:
 
 ```bash
 # 1. Run initial sync (creates TEXT columns and detects option sets)
-python sync_dataverse.py
+sync-dataverse
 
 # 2. Generate config from detected option sets
-mkdir -p config
-python generate_optionset_config.py > config/optionsets.json
+generate-optionset-config > custom_optionsets.json
 
 # Or with custom database path:
-# python generate_optionset_config.py --db /path/to/my.db > config/optionsets.json
+# generate-optionset-config --db /path/to/my.db > custom_optionsets.json
 
 # 3. Review generated config
-cat config/optionsets.json
+cat custom_optionsets.json
 
 # 4. Delete database and re-sync with INTEGER columns
 rm dataverse_complete.db
-python sync_dataverse.py
+sync-dataverse --optionsets-config custom_optionsets.json
 ```
 
 **Configuration Options:**
-- `--db PATH`: Specify custom database path (default: `dataverse_complete.db`)
-- Run `python generate_optionset_config.py --help` for more options
+- `--db PATH`: Specify custom database path (default: from SQLITE_DB_PATH env var)
+- Run `generate-optionset-config --help` for more options
 
 **After setup:** The config is loaded automatically on every sync. Regenerate when adding new entities or if Dataverse schema changes.
 
@@ -454,37 +520,141 @@ These entities were identified by analyzing foreign key references in the synced
 
 ## Usage
 
+### Programmatic API (Apache Airflow / Python Scripts)
+
+Use `run_sync()` to call the sync workflow programmatically from Apache Airflow DAGs or other Python scripts:
+
+```python
+import asyncio
+import logging
+from igh_data_sync import run_sync
+from igh_data_sync.config import Config
+
+async def main():
+    # Create configuration
+    config = Config(
+        api_url="https://org.api.crm.dynamics.com/api/data/v9.2/",
+        client_id="your-client-id",
+        client_secret="your-client-secret",
+        scope="https://org.crm.dynamics.com/.default",
+        sqlite_db_path="dataverse.db"
+    )
+
+    # Setup logger (optional - omit for silent operation)
+    logger = logging.getLogger(__name__)
+
+    # Run sync
+    success = await run_sync(
+        config=config,
+        verify_reference=True,  # Optional: verify FK integrity
+        logger=logger           # Optional: for integrated logging
+    )
+
+    if not success:
+        raise Exception("Sync failed")
+
+asyncio.run(main())
+```
+
+**Apache Airflow Example:**
+
+```python
+from airflow import DAG
+from airflow.operators.python import PythonOperator
+from datetime import datetime
+import asyncio
+from igh_data_sync import run_sync
+from igh_data_sync.config import Config
+
+def sync_dataverse_task(**context):
+    config = Config(
+        api_url=Variable.get("DATAVERSE_API_URL"),
+        client_id=Variable.get("DATAVERSE_CLIENT_ID"),
+        client_secret=Variable.get("DATAVERSE_CLIENT_SECRET"),
+        scope=Variable.get("DATAVERSE_SCOPE"),
+        sqlite_db_path="/data/dataverse.db"
+    )
+
+    success = asyncio.run(run_sync(
+        config=config,
+        verify_reference=True,
+        logger=context['task_instance'].log  # Use Airflow's logger
+    ))
+
+    if not success:
+        raise Exception("Dataverse sync failed")
+
+with DAG('dataverse_sync', start_date=datetime(2024, 1, 1), schedule_interval='@daily') as dag:
+    sync_task = PythonOperator(task_id='sync_dataverse', python_callable=sync_dataverse_task)
+```
+
+See `examples/example_run_sync_usage.py` for more examples.
+
+**API Reference:**
+```python
+async def run_sync(
+    config: Config,                              # Required: API credentials and DB path
+    entities_config: Optional[list[EntityConfig]] = None,  # Optional: custom entities
+    optionsets_config: Optional[dict] = None,    # Optional: custom option sets
+    verify_reference: bool = False,              # Optional: verify FK integrity
+    logger: Optional[logging.Logger] = None      # Optional: for logging output
+) -> bool:  # Returns True on success, False on failure
+```
+
 ### Schema Validation
 
 Validate database schema against Dataverse $metadata:
 
 ```bash
-# Activate virtualenv first
-source .venv/bin/activate
-
 # Basic validation (auto-detect database type)
-python validate_schema.py
+validate-schema
 
 # Specify database type
-python validate_schema.py --db-type sqlite
-python validate_schema.py --db-type postgresql
+validate-schema --db-type sqlite
+validate-schema --db-type postgresql
+
+# Custom configuration files
+validate-schema \
+  --env-file /path/to/.env \
+  --entities-config /path/to/entities.json
 
 # Custom report paths
-python validate_schema.py \
+validate-schema \
   --json-report reports/schema.json \
   --md-report reports/schema.md
+
+# Full example with all options
+validate-schema \
+  --env-file production.env \
+  --entities-config config/prod-entities.json \
+  --db-type postgresql \
+  --json-report reports/prod-validation.json \
+  --md-report reports/prod-validation.md
 ```
 
 ### Data Sync
 
-Sync Dataverse entities to SQLite with integrated schema validation:
+Sync Dataverse entities to SQLite/PostgreSQL with integrated schema validation:
 
 ```bash
-# Activate virtualenv first
-source .venv/bin/activate
+# Basic sync (uses default configs from package)
+sync-dataverse
 
-# Run sync
-python sync_dataverse.py
+# Custom configuration files
+sync-dataverse \
+  --env-file /path/to/.env \
+  --entities-config /path/to/entities.json \
+  --optionsets-config /path/to/optionsets.json
+
+# Sync with reference verification
+sync-dataverse --verify
+
+# Full example with all options
+sync-dataverse \
+  --env-file production.env \
+  --entities-config config/prod-entities.json \
+  --optionsets-config config/prod-optionsets.json \
+  --verify
 ```
 
 The sync tool automatically:
@@ -543,10 +713,10 @@ Verify foreign key integrity after sync to ensure the synced subset is self-cont
 
 ```bash
 # Normal sync
-python sync_dataverse.py
+sync-dataverse
 
 # Sync with reference verification
-python sync_dataverse.py --verify
+sync-dataverse --verify
 ```
 
 **What it does:**
@@ -621,16 +791,17 @@ pytest --cov=lib --cov-report=term-missing tests/
 
 ### Test Coverage
 
-Current coverage: **65%+** (107 tests passing)
+Current coverage: **59%+** (121 tests passing)
 
 **Coverage by module:**
-- lib/auth.py: 96.77%
-- lib/dataverse_client.py: 50.00%
-- lib/sync/database.py: 92%+ (includes SCD2 and junction table temporal tracking)
-- lib/sync/entity_sync.py: 57.50%
-- lib/sync/filtered_sync.py: 63.24%
-- lib/validation/validator.py: 84.51%
-- lib/type_mapping.py: 84.62%
+- igh_data_sync/auth.py: 96.77%
+- igh_data_sync/dataverse_client.py: 47.31%
+- igh_data_sync/sync/database.py: 91%+ (includes SCD2 and junction table temporal tracking)
+- igh_data_sync/sync/entity_sync.py: 57.50%
+- igh_data_sync/sync/filtered_sync.py: 74.03%
+- igh_data_sync/validation/validator.py: 75.59%
+- igh_data_sync/type_mapping.py: 89.00%
+- igh_data_sync/scripts/sync.py: 50.67% (includes new run_sync API)
 
 **Test types:**
 - **Unit tests** (tests/unit/): Individual component testing
@@ -711,15 +882,23 @@ The sync tool validates schemas before each sync and handles changes automatical
 
 ## CI/CD Integration
 
-The validator returns appropriate exit codes:
-- **0** - Validation passed (no critical errors)
-- **1** - Validation failed (critical errors detected)
+All CLI commands return appropriate exit codes:
+- **0** - Success (validation passed, sync completed, no reference issues)
+- **1** - Failure (validation failed, sync error, dangling references with --verify)
 
 Example CI workflow:
 ```yaml
+- name: Install Package
+  run: |
+    pip install igh-data-sync
+
 - name: Validate Schema
   run: |
-    python3 validate_schema.py --db-type sqlite
+    validate-schema --db-type sqlite
+
+- name: Sync Data
+  run: |
+    sync-dataverse --verify
 ```
 
 ## Success Criteria
@@ -750,7 +929,8 @@ Example CI workflow:
 - ✅ Sync state tracking (_sync_state, _sync_log)
 - ✅ SCD2 UPSERT operations with change detection
 - ✅ Option set configuration for INTEGER columns
-- ✅ 107 tests (65%+ coverage), all passing
+- ✅ **Programmatic API** (`run_sync()`) for Apache Airflow integration
+- ✅ 121 tests (59%+ coverage), all passing
 - ✅ Pre-commit hooks (ruff, pylint)
 - ✅ Type checking and linting
 

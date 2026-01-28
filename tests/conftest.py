@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from lib.config import Config
+from igh_data_sync.config import Config
 
 
 @pytest.fixture

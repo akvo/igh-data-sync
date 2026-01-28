@@ -1,8 +1,42 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
-name = "igh-clean-sync"
+name = "igh-data-sync"
 version = "0.1.0"
-description = "Microsoft Dataverse integration toolkit with schema validation and data synchronization"
+description = "Microsoft Dataverse integration toolkit with SCD2 temporal tracking"
+readme = "README.md"
 requires-python = ">=3.9"
+authors = [
+    { name = "Akvo", email = "tech@akvo.org" }
+]
+
+dependencies = [
+    "aiohttp>=3.9.0",
+    "python-dotenv>=1.0.0",
+    "requests>=2.31.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.1.13",
+    "pylint>=3.0.0",
+    "mypy>=1.8.0",
+    "types-requests>=2.31.0",
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-mock>=3.15.0",
+    "aioresponses>=0.7.8",
+    "responses>=0.25.0",
+    "pre-commit>=3.5.0",
+]
+
+[project.scripts]
+sync-dataverse = "igh_data_sync.scripts.sync:main"
+validate-schema = "igh_data_sync.scripts.validate:main"
+generate-optionset-config = "igh_data_sync.scripts.optionset:main"
 
 [tool.ruff]
 line-length = 120
@@ -124,8 +158,8 @@ show_column_numbers = true
 pretty = true
 
 [[tool.mypy.overrides]]
-# Stricter settings for lib/ modules (production code)
-module = "lib.*"
+# Stricter settings for igh_data_sync/ modules (production code)
+module = "igh_data_sync.*"
 warn_return_any = true
 disallow_untyped_defs = false  # Can enable later: true
 
@@ -163,13 +197,14 @@ markers = [
 
 [tool.coverage.run]
 # Coverage measurement configuration
-source = ["lib"]
+source = ["src/igh_data_sync"]
 branch = true
 parallel = true
 omit = [
     "tests/*",
     "*/__pycache__/*",
     "*.pyc",
+    "*/site-packages/*",
 ]
 
 [tool.coverage.report]

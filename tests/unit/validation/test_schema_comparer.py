@@ -2,8 +2,8 @@
 
 import pytest
 
-from lib.type_mapping import ColumnMetadata, ForeignKeyMetadata, TableSchema
-from lib.validation.schema_comparer import SchemaComparer
+from igh_data_sync.type_mapping import ColumnMetadata, ForeignKeyMetadata, TableSchema
+from igh_data_sync.validation.schema_comparer import SchemaComparer
 
 
 class TestSchemaComparer:

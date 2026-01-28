@@ -1,6 +1,6 @@
 """Fake DataverseClient for E2E testing without real API calls."""
 
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 
 class FakeDataverseClient:
@@ -85,7 +85,7 @@ class FakeDataverseClient:
         """Return count of canned records."""
         return self._entity_counts.get(entity_name, 0)
 
-    async def get(self, endpoint: str) -> dict | str:
+    async def get(self, endpoint: str) -> Union[dict, str]:
         """Generic GET method."""
         if endpoint == "$metadata":
             return await self.get_metadata()

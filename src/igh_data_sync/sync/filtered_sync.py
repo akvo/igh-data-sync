@@ -4,6 +4,8 @@ Syncs only referenced records for filtered entities (accounts, contacts, systemu
 instead of downloading all records from Dataverse.
 """
 
+from typing import Optional
+
 from ..config import EntityConfig
 from ..dataverse_client import DataverseClient
 from ..type_mapping import TableSchema
@@ -168,7 +170,7 @@ class FilteredSyncManager:
         ids: set[str],
         entity_api_name: str,
         primary_key: str,
-        last_timestamp: str | None,
+        last_timestamp: Optional[str],
     ) -> tuple[set[str], set[str]]:
         """
         Separate IDs into new (never synced) vs existing (check for updates).
@@ -210,7 +212,7 @@ class FilteredSyncManager:
         batch: list[str],
         primary_key: str,
         entity_api_name: str,
-        timestamp_filter: str | None = None,
+        timestamp_filter: Optional[str] = None,
     ) -> list[dict]:
         """
         Fetch records for a batch of IDs with optional timestamp filter.

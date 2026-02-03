@@ -240,6 +240,45 @@ cp .env.example .env
 vim .env
 ```
 
+### As a Dependency
+
+To add `igh-data-sync` as a dependency in another project:
+
+**Using UV (Recommended):**
+```bash
+uv add git+https://github.com/akvo/igh-data-sync.git
+```
+
+**Using pip:**
+```bash
+pip install git+https://github.com/akvo/igh-data-sync.git
+```
+
+**SSH Method (Alternative):**
+```bash
+uv add git+ssh://git@github.com/akvo/igh-data-sync.git
+```
+
+**Specific Version/Branch/Tag:**
+```bash
+# Specific branch
+uv add git+https://github.com/akvo/igh-data-sync.git@main
+
+# Specific tag
+uv add git+https://github.com/akvo/igh-data-sync.git@v1.0.0
+
+# Specific commit
+uv add git+https://github.com/akvo/igh-data-sync.git@a58cd21
+```
+
+**Result in pyproject.toml:**
+```toml
+[project]
+dependencies = [
+    "igh-data-sync @ git+https://github.com/akvo/igh-data-sync.git",
+]
+```
+
 ### Using UV (Recommended)
 
 ```bash

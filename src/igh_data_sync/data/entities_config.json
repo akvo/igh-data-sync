@@ -79,12 +79,6 @@
       "description": "All CAP parameter records"
     },
     {
-      "name": "vin_routeofadministration",
-      "api_name": "vin_routeofadministrations",
-      "filtered": false,
-      "description": "Route of administration records"
-    },
-    {
       "name": "account",
       "api_name": "accounts",
       "filtered": true,

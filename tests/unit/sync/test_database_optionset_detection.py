@@ -19,28 +19,28 @@ class TestDatabaseOptionSetDetection:
 
     def test_ensure_optionset_table(self):
         """Test creating option set lookup table."""
-        self.db.ensure_optionset_table("statuscode")
+        self.db.optionset_manager.ensure_optionset_table("statuscode")
 
         assert self.db.table_exists("_optionset_statuscode") is True
 
         # Calling again should be idempotent
-        self.db.ensure_optionset_table("statuscode")
+        self.db.optionset_manager.ensure_optionset_table("statuscode")
         assert self.db.table_exists("_optionset_statuscode") is True
 
     def test_ensure_junction_table(self):
         """Test creating junction table."""
         # First create entity and lookup tables
         self.db.execute("CREATE TABLE accounts (accountid TEXT PRIMARY KEY)")
-        self.db.ensure_optionset_table("categories")
+        self.db.optionset_manager.ensure_optionset_table("categories")
 
         # Create junction table
-        self.db.ensure_junction_table("accounts", "categories", "accountid")
+        self.db.optionset_manager.ensure_junction_table("accounts", "categories", "accountid")
 
         assert self.db.table_exists("_junction_accounts_categories") is True
 
     def test_upsert_option_set_value_creates_table(self):
         """Test that upsert creates table if needed."""
-        self.db.upsert_option_set_value("statuscode", 1, "Active")
+        self.db.optionset_manager.upsert_option_set_value("statuscode", 1, "Active")
 
         # Table should exist
         assert self.db.table_exists("_optionset_statuscode") is True
@@ -69,7 +69,7 @@ class TestDatabaseOptionSetDetection:
             )
         }
 
-        self.db.populate_detected_option_sets(detected, "accounts", "acc123", "accountid")
+        self.db.optionset_manager.populate_detected_option_sets(detected, "accounts", "acc123", "accountid")
 
         # Check lookup table populated
         cursor = self.db.conn.cursor()
@@ -97,7 +97,7 @@ class TestDatabaseOptionSetDetection:
             )
         }
 
-        self.db.populate_detected_option_sets(detected, "accounts", "acc123", "accountid")
+        self.db.optionset_manager.populate_detected_option_sets(detected, "accounts", "acc123", "accountid")
 
         # Check lookup table populated
         cursor = self.db.conn.cursor()

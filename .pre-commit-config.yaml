@@ -55,6 +55,15 @@ repos:
       - id: mixed-line-ending
         args: [--fix=lf]
 
+  # Pylint checks not covered by Ruff (file length)
+  - repo: https://github.com/pylint-dev/pylint
+    rev: v3.3.7
+    hooks:
+      - id: pylint
+        args: [--disable=all, --enable=C0302, --max-module-lines=500]
+        # Only check lib/ directory (not tests or scripts)
+        files: ^lib/
+
   # Run tests before commit (optional, can be commented out if too slow)
   - repo: local
     hooks:

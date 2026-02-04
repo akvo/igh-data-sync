@@ -315,7 +315,7 @@ class TestJunctionTableSCD2:
         """)
 
         # Create junction table with temporal tracking
-        self.db.ensure_junction_table("accounts", "categories", "accountid")
+        self.db.optionset_manager.ensure_junction_table("accounts", "categories", "accountid")
 
         yield
         self.db.close()
@@ -332,7 +332,7 @@ class TestJunctionTableSCD2:
             business_key_value="a1",
         )
 
-        self.db.snapshot_junction_relationships(
+        self.db.optionset_manager.snapshot_junction_relationships(
             table_name="_junction_accounts_categories",
             entity_id="a1",
             option_codes=[1, 2, 3],
@@ -356,7 +356,7 @@ class TestJunctionTableSCD2:
         """Test junction snapshot closes old records and creates new ones."""
 
         # Initial snapshot
-        self.db.snapshot_junction_relationships(
+        self.db.optionset_manager.snapshot_junction_relationships(
             table_name="_junction_accounts_categories",
             entity_id="a1",
             option_codes=[1, 2],
@@ -364,7 +364,7 @@ class TestJunctionTableSCD2:
         )
 
         # Update: different categories
-        self.db.snapshot_junction_relationships(
+        self.db.optionset_manager.snapshot_junction_relationships(
             table_name="_junction_accounts_categories",
             entity_id="a1",
             option_codes=[2, 3, 4],
@@ -419,7 +419,7 @@ class TestJunctionTableSCD2:
             )
         }
 
-        self.db.populate_detected_option_sets(
+        self.db.optionset_manager.populate_detected_option_sets(
             detected=detected,
             entity_name="accounts",
             entity_id="a1",
@@ -440,7 +440,7 @@ class TestJunctionTableSCD2:
             business_key_value="a1",
         )
 
-        self.db.populate_detected_option_sets(
+        self.db.optionset_manager.populate_detected_option_sets(
             detected=detected,
             entity_name="accounts",
             entity_id="a1",
@@ -455,21 +455,21 @@ class TestJunctionTableSCD2:
     def test_junction_query_active_relationships(self):
         """Test querying active relationships with WHERE valid_to IS NULL."""
         # Create 3 versions of same entity
-        self.db.snapshot_junction_relationships(
+        self.db.optionset_manager.snapshot_junction_relationships(
             table_name="_junction_accounts_categories",
             entity_id="a1",
             option_codes=[1, 2],
             valid_from="2024-01-01T09:00:00Z",
         )
 
-        self.db.snapshot_junction_relationships(
+        self.db.optionset_manager.snapshot_junction_relationships(
             table_name="_junction_accounts_categories",
             entity_id="a1",
             option_codes=[2, 3],
             valid_from="2024-02-01T09:00:00Z",
         )
 
-        self.db.snapshot_junction_relationships(
+        self.db.optionset_manager.snapshot_junction_relationships(
             table_name="_junction_accounts_categories",
             entity_id="a1",
             option_codes=[3, 4, 5],
@@ -493,21 +493,21 @@ class TestJunctionTableSCD2:
     def test_junction_point_in_time_query(self):
         """Test querying relationships as of specific date."""
         # Create 3 versions
-        self.db.snapshot_junction_relationships(
+        self.db.optionset_manager.snapshot_junction_relationships(
             table_name="_junction_accounts_categories",
             entity_id="a1",
             option_codes=[1, 2],
             valid_from="2024-01-01T09:00:00Z",
         )
 
-        self.db.snapshot_junction_relationships(
+        self.db.optionset_manager.snapshot_junction_relationships(
             table_name="_junction_accounts_categories",
             entity_id="a1",
             option_codes=[2, 3],
             valid_from="2024-02-01T09:00:00Z",
         )
 
-        self.db.snapshot_junction_relationships(
+        self.db.optionset_manager.snapshot_junction_relationships(
             table_name="_junction_accounts_categories",
             entity_id="a1",
             option_codes=[3, 4, 5],

@@ -55,6 +55,16 @@ repos:
       - id: mixed-line-ending
         args: [--fix=lf]
 
+  # Pylint file length check (enforces 400-line limit per module from .pylintrc)
+  - repo: local
+    hooks:
+      - id: pylint-file-length
+        name: pylint (file length only)
+        entry: .venv/bin/pylint --rcfile=.pylintrc
+        language: system
+        types: [python]
+        files: ^src/
+
   # Run tests before commit (optional, can be commented out if too slow)
   - repo: local
     hooks:

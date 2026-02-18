@@ -79,6 +79,12 @@
       "description": "All CAP parameter records"
     },
     {
+      "name": "vin_developer",
+      "api_name": "vin_developers",
+      "filtered": false,
+      "description": "All developer records"
+    },
+    {
       "name": "account",
       "api_name": "accounts",
       "filtered": true,
@@ -152,9 +158,9 @@
     }
   ],
   "metadata": {
-    "total_entities": 26,
+    "total_entities": 27,
     "filtered_entities": 4,
-    "unfiltered_entities": 22,
+    "unfiltered_entities": 23,
     "description": "Configuration for Dataverse entity sync - specifies which entities are synced in full vs filtered by foreign key relationships"
   }
 }

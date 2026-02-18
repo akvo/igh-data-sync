@@ -222,9 +222,14 @@ async def run_sync(  # noqa: C901, PLR0912
 
     # [2] Load optionsets config if not provided
     if optionsets_config is None:
-        if logger:
-            logger.info("Loading optionsets from package defaults")
-        optionsets_config = load_optionsets_config()  # Uses package data
+        try:
+            optionsets_config = load_optionsets_config()  # Uses package data
+            if logger:
+                logger.info("Loading optionsets from package defaults")
+        except FileNotFoundError:
+            optionsets_config = {}
+            if logger:
+                logger.info("No optionsets config found, option set fields will be stored as TEXT")
 
     # [3] Authenticate with Dataverse
     if logger:

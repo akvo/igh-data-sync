@@ -3,6 +3,7 @@
     "accessmode",
     "address1_addresstypecode",
     "address1_shippingmethodcode",
+    "address1_utcoffset",
     "address2_addresstypecode",
     "address2_shippingmethodcode",
     "azurestate",
@@ -38,6 +39,7 @@
     "accountratingcode",
     "address1_addresstypecode",
     "address1_shippingmethodcode",
+    "address1_utcoffset",
     "address2_addresstypecode",
     "address2_freighttermscode",
     "address2_shippingmethodcode",
@@ -83,9 +85,18 @@
   "contact": [
     "address1_addresstypecode",
     "address1_shippingmethodcode",
+    "address1_utcoffset",
     "address2_addresstypecode",
     "address2_freighttermscode",
     "address2_shippingmethodcode",
+    "adx_confirmremovepassword",
+    "adx_identity_emailaddress1confirmed",
+    "adx_identity_locallogindisabled",
+    "adx_identity_lockoutenabled",
+    "adx_identity_mobilephoneconfirmed",
+    "adx_identity_twofactorenabled",
+    "adx_profilealert",
+    "adx_profileisanonymous",
     "creditonhold",
     "customersizecode",
     "customertypecode",
@@ -105,6 +116,9 @@
     "leadsourcecode",
     "marketingonly",
     "merged",
+    "msdyn_disablewebtracking",
+    "msdyn_isminor",
+    "msdyn_isminorwithparentalconsent",
     "participatesinworkflow",
     "preferredappointmenttimecode",
     "preferredcontactmethodcode",
@@ -118,12 +132,14 @@
     "vin_advocacycontactyn",
     "vin_expertadvisorygroupmemberyn",
     "vin_gfindercontacttrigger",
+    "vin_gfindersync",
     "vin_groupmail",
     "vin_groupmailyn",
     "vin_mediacontactyn",
     "vin_migratedyn",
     "vin_radarrecipientyn",
     "vin_reproductivehealthprimarycontactyn",
+    "vin_synctotm",
     "vin_tempupdate"
   ],
   "vin_disease": [
@@ -234,6 +250,8 @@
     "vin_whosnakespeciesriskcategory"
   ],
   "transactioncurrency": [
+    "currencyprecision",
+    "currencytype",
     "entityimage_timestamp",
     "importsequencenumber",
     "statecode",
@@ -326,7 +344,7 @@
     "versionnumber",
     "vin_parametertype"
   ],
-  "vin_routeofadministration": [
+  "vin_developer": [
     "importsequencenumber",
     "statecode",
     "statuscode",
